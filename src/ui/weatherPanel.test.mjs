@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { createWeatherPanel } from './weatherPanel.js';
 import { railFixture } from './railTestFixture.mjs';
 const ticks = ['2026-09-22T01:00:00Z', '2026-09-22T01:05:00Z'];
@@ -653,4 +655,47 @@ test('a change of open card scrolls its header into view once; refreshes never m
   assert.equal(writes.length, 4, 'refresh after a reveal leaves it alone');
   assert.deepEqual(intoView, [], 'ancestor scrollers are never moved');
   view.destroy();
+});
+
+test('the Alpine card is in the weather order but not in the observed group', () => {
+  // OBSERVED used to be ORDER.slice(2), so inserting any card into the middle
+  // of the order silently enrolled it in the timeline. It is named now, and
+  // this pins that: an observed card is driven by the clock and reports a
+  // frame time, which a station network does not have.
+  const source = readFileSync(
+    new URL('./weatherPanel.js', import.meta.url),
+    'utf8',
+  );
+  const declarations = source.slice(
+    source.indexOf('const ORDER ='),
+    source.indexOf('const utc ='),
+  );
+  const { order, observed, listBlocks } = JSON.parse(
+    runInNewContext(
+      `${declarations}\nJSON.stringify({ order: ORDER, observed: [...OBSERVED], listBlocks: LIST_BLOCK_IDS })`,
+    ),
+  );
+  assert.deepEqual(order, [
+    'weather-cyclones',
+    'wind',
+    'alpine-stations',
+    'weather-radar',
+    'weather-satellite',
+    'weather-lightning',
+  ]);
+  assert.deepEqual(observed, [
+    'weather-radar',
+    'weather-satellite',
+    'weather-lightning',
+  ]);
+  for (const id of observed) assert.ok(order.includes(id), id);
+  assert.ok(!observed.includes('alpine-stations'));
+  // Every list block keeps its own stable id, per docs/CODE-BOUNDARIES.md.
+  assert.equal(listBlocks['weather-cyclones'], 'storms');
+  assert.equal(listBlocks['alpine-stations'], 'stations');
+  assert.equal(
+    new Set(Object.values(listBlocks)).size,
+    Object.keys(listBlocks).length,
+  );
+  for (const id of Object.keys(listBlocks)) assert.ok(order.includes(id), id);
 });

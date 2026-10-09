@@ -25,6 +25,7 @@ import { createApplicationAwareness } from './layers/militaryAwareness.js';
 import { createApplicationFirms } from './layers/firms.js';
 import { createApplicationEarthquakes } from './layers/earthquakes.js';
 import { createApplicationFirePerimeters } from './layers/perimeters.js';
+import { createApplicationAlpineStations } from './layers/alpineStations.js';
 import { createApplicationCables } from './layers/submarineCables.js';
 import { createApplicationStreetLevel } from './layers/streetLevel.js';
 import { createInfrastructureLayers } from '../data/infrastructure.js';
@@ -54,6 +55,7 @@ const SOURCE_METHODS = Object.freeze({
   wind: ['getSnapshot'],
   weather: ['getSnapshot'],
   cyclones: ['getSnapshot'],
+  'alpine-stations': ['getSnapshot'],
   earthquakes: ['getSnapshot'],
   'fire-perimeters': ['getSnapshot'],
   cables: ['fetch'],
@@ -68,10 +70,27 @@ export const LOCAL_ONLY_LAYER_METADATA = Object.freeze([
   Object.freeze({ id: 'local-adsb', disposition: 'local-only' }),
 ]);
 
+/**
+ * Layers that are registered and drawable but hold no share-link token yet.
+ *
+ * The token namespace is the maintainers' to allocate (#658), so a new layer
+ * ships without one rather than claiming a letter. The only consequence is
+ * that its enabled state and options do not travel in a share link; it is
+ * otherwise an ordinary layer. Moving an entry into `LAYER_STATE_REGISTRY`
+ * with a token is all that is needed to complete it.
+ */
+export const PENDING_SHARE_TOKEN_LAYER_METADATA = Object.freeze([
+  Object.freeze({
+    id: 'alpine-stations',
+    disposition: 'pending-share-token',
+  }),
+]);
+
 /** Serialization metadata for every layer the application catalog constructs. */
 export const APPLICATION_LAYER_METADATA = Object.freeze([
   ...LAYER_STATE_REGISTRY,
   ...LOCAL_ONLY_LAYER_METADATA,
+  ...PENDING_SHARE_TOKEN_LAYER_METADATA,
 ]);
 
 /** Construct the current catalog without choosing any source provider.
@@ -189,6 +208,9 @@ export function createApplicationCatalog({
           clock: weatherClock,
         }),
         createCyclonesLayer({ feed: sources.cyclones }),
+        createApplicationAlpineStations({
+          source: sources['alpine-stations'],
+        }),
         ...createInfrastructureLayers(localGeoJsonServices),
         createApplicationCables({ source: sources.cables }),
         createApplicationFirms({

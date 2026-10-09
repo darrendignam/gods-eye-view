@@ -7,11 +7,25 @@ const openDocuments = new WeakMap();
 const ORDER = [
   'weather-cyclones',
   'wind',
+  'alpine-stations',
   'weather-radar',
   'weather-satellite',
   'weather-lightning',
 ];
-const OBSERVED = new Set(ORDER.slice(2));
+// Named rather than taken positionally from ORDER: the observed-history group
+// is the three timeline-driven raster products, and inserting any other card
+// into the order must not silently enrol it in the timeline.
+const OBSERVED = new Set([
+  'weather-radar',
+  'weather-satellite',
+  'weather-lightning',
+]);
+// A card's list block keeps its own stable id, per the block-id contract in
+// docs/CODE-BOUNDARIES.md.
+const LIST_BLOCK_IDS = Object.freeze({
+  'weather-cyclones': 'storms',
+  'alpine-stations': 'stations',
+});
 const utc = (time) =>
   Number.isFinite(Date.parse(time))
     ? `${new Date(time).toISOString().slice(5, 16).replace('T', ' ')} UTC`
@@ -199,8 +213,8 @@ export function createWeatherPanel({
         },
       };
       const blocks = [
-        ...(id === 'weather-cyclones' && list?.items?.length
-          ? [{ id: 'storms', type: 'list', list }]
+        ...(LIST_BLOCK_IDS[id] && list?.items?.length
+          ? [{ id: LIST_BLOCK_IDS[id], type: 'list', list }]
           : []),
         { id: 'details', type: 'lines', lines },
         ...(legend.length ? [legendBlock] : []),
