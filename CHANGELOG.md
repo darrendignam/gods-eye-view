@@ -10,7 +10,9 @@
   cannot supply a measurement honestly does not claim it: SwissMetNet
   contributes no snow depth and GeoSphere no sea-level pressure. In the wind
   view a station with a working vane in moving air draws an arrowhead pointing
-  downwind instead of a dot. Replaces #58.
+  downwind instead of a dot. Marker size is continuous in the reading, so a
+  bigger number is a bigger marker. All three operators are credited on the
+  globe while the layer is on. Replaces #58.
 
 - Vector tile sources take their allowed tile origin from the configured
   `tileJsonUrl`, so repointing only that URL at a mirror loads tiles from the
