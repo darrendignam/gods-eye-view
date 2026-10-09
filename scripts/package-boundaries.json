@@ -2197,7 +2197,8 @@
       "src/layers/alpineStations/model.js",
       "src/layers/alpineStations/source.js",
       "src/layers/alpineStations/index.js",
-      "src/app/layers/alpineStations.js"
+      "src/app/layers/alpineStations.js",
+      "src/layers/alpineStations/windArrow.js"
     ],
     "external": [
       "hls.js",
@@ -2725,7 +2726,8 @@
       "src/layers/alpineStations/model.js",
       "src/layers/alpineStations/source.js",
       "src/layers/alpineStations/index.js",
-      "src/app/layers/alpineStations.js"
+      "src/app/layers/alpineStations.js",
+      "src/layers/alpineStations/windArrow.js"
     ],
     "external": [
       "hls.js",
