@@ -20,6 +20,7 @@ How to read this:
 | **NOAA nowCOAST observed weather** (`nowcoast.noaa.gov/geoserver/observations/{weather_radar,satellite}/ows`, WMS 1.1.1) | Rain radar (MRMS base reflectivity, contiguous US, about 4-minute updates) and Satellite clouds (GOES-19/18 Band 14 regional infrared, about 5-minute updates; global infrared mosaic, hourly). Keyless; layer metadata refreshed every 2 minutes, exact-time images cached for up to 24 hours | [NOAA disclaimer](https://oceanservice.noaa.gov/disclaimer.html) | "NOAA nowCOAST · NWS/OAR MRMS radar; NESDIS GOES and global satellite partners" |
 | **NOAA nowCOAST lightning density** (`nowcoast.noaa.gov/geoserver/observations/lightning_detection/ows`) | Lightning density: 15-minute accumulated strike density on an approximately 8 km grid, Americas and Pacific. Keyless; layer metadata refreshed every 10 minutes, exact-time images cached for up to 24 hours | NOAA Level-5 derived product from Vaisala NLDN/GLD360; the [product description](https://ocean.weather.gov/lightning/lightning_pdd.php) permits public distribution of this density product, not of raw Vaisala detections | "NOAA/NWS nowCOAST; derived from Vaisala NLDN/GLD360" |
 | **NOAA NHC / CPHC advisories** (`www.nhc.noaa.gov/CurrentStorms.json` + the `mapservices.weather.noaa.gov` tropical weather summary MapServer) | Cyclone advisories: storm positions, forecast tracks, points and cones for the Atlantic and eastern/central North Pacific. Keyless through `/api/cyclones`; cached for 5 minutes | [NWS public-data terms](https://www.weather.gov/disclaimer); no endorsement implied | "NOAA/NWS NHC / CPHC" |
+| **Alpine weather stations** (`measurement-api.slf.ch`, `data.geo.admin.ch`, `dataset.api.hub.geosphere.at`) | Alpine Stations: about 650 automatic stations across the Swiss and Austrian Alps reporting snow depth, wind, temperature, precipitation and pressure. Keyless through `/api/alpine-stations`; readings cached for 5 minutes, station metadata for 24 hours | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) from all three operators | "WSL Institute for Snow and Avalanche Research SLF", "MeteoSwiss", "GeoSphere Austria" |
 | **Mapillary** (vector tiles, Graph API, MapillaryJS) | Street Level: coverage lines, image cones and the embedded viewer. Coverage tiles cached for 24 h | Imagery [CC BY-SA 4.0](https://www.mapillary.com/terms); API under the Mapillary terms with a client token | "© Mapillary contributors, CC BY-SA 4.0", shown on the globe while the provider is on |
 | **OpenStreetMap** | Map and place data (roads, military areas and names, ALPR, place search, outlines); via vector tiles, hourly ALPR extract, bundled data, Nominatim and optional self-configured Overpass | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/) | © OpenStreetMap contributors |
 | **Google Map Tiles API** (Photorealistic 3D Tiles) + Places/Geocoding | The 3D globe, voice scene context, and on-demand nearby installation search                                                         | Google Maps Platform ToS (proprietary, your own key + billing)                                                                                                                                                                                                                                                                                        | "Google" / "Google Maps" logo — **shown in-app**, required                                                                                  |
@@ -303,6 +304,52 @@ This implementation is original; those contributions have not been merged here.
 - **Delivery:** keyless same-origin `/api/cyclones`, five-minute singleflight cache,
   fixed upstream endpoints, bounded bodies/geometry/deadline, explicit unavailable/stale states.
   Direct status fetching is unsuitable in browsers because NHC does not advertise CORS.
+
+### Weather: Alpine automatic stations
+
+- **Sources:** three keyless, openly licensed national networks, each with its own adapter:
+  - [WSL/SLF IMIS](https://www.slf.ch/) — `measurement-api.slf.ch/public/api/imis/{stations,measurements}`,
+    about 200 snow and wind stations, most above the tree line, every 30 minutes.
+  - [MeteoSwiss SwissMetNet](https://www.meteoswiss.admin.ch/) —
+    `data.geo.admin.ch/ch.meteoschweiz.ogd-smn/ogd-smn_meta_stations.csv` for identity and
+    `data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/VQHA80.csv` for the whole network's
+    current values, 159 stations, every 10 minutes.
+  - [GeoSphere Austria TAWES](https://data.hub.geosphere.at/) —
+    `dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min`, about 285 active
+    stations, every 10 minutes.
+- **Rights/credit:** every network publishes under CC BY 4.0, which is the condition of
+  inclusion in this layer. All three operators are named in the in-app credit lightbox
+  whenever their data is on screen, and a network that fails to load is not credited.
+- **Coverage/meaning:** the Swiss and Austrian Alps only. This layer shows MEASUREMENTS.
+  Snow depth is not an avalanche danger rating; each operator publishes a danger bulletin
+  as a separate product, which this layer does not reproduce.
+  Per-network capability is explicit, because two operators cannot supply a parameter
+  honestly through these endpoints:
+  - SwissMetNet contributes no **snow depth**: `htoauts0` is published per station but is
+    not a VQHA80 column, and the per-station alternative costs about 160 requests per
+    refresh. Swiss snow depth comes from SLF IMIS, the network built for it.
+  - GeoSphere contributes no **pressure**: `P` is station level and `PRED` is reduced only
+    to a local datum — Wien/Hohe Warte at 198 m reads P 991.7 against PRED 1016.4, but
+    Sonnblick at 3109 m reads P 696.7 against PRED 707.7. Nothing in the payload says
+    which regime a station is in, so including it would draw a map of Austrian altitude.
+  Pressure is therefore QFF only, never station level (QFE) or standard-atmosphere (QNH).
+  An absent reading stays absent: 0 cm, 0 mm and 0 °C are all real, common readings, and a
+  station without a sensor is not a station reading zero.
+- **Delivery:** keyless same-origin `/api/alpine-stations`, one in-flight refresh per
+  upstream, fixed upstream URLs with per-file read caps, a five-minute reading cache and a
+  24-hour metadata cache, a per-IP throttle, and explicit per-network
+  ok/stale/unavailable states so one operator being down never blanks the others.
+  Direct browser fetching is unsuitable for all three: SLF advertises no CORS at all, and
+  the other two need their identity and reading payloads joined before rendering.
+
+- **Networks reviewed and not included.** Checked at the maintainers' suggestion; each
+  needs its own adapter and its own terms check, and none is blocked by this design:
+  | Network | Finding |
+  |---|---|
+  | Météo-France (Donnees Publiques) | Requires an API key; belongs behind the key registry, not in a keyless layer |
+  | DWD Open Data (Germany) | Openly licensed, but the 10-minute observations are one ZIP per station — roughly 500 downloads for one snapshot. Needs a different product (MOSMIX or a station aggregate) before an adapter is worth writing |
+  | ARSO (Slovenia) | Single keyless XML feed confirmed working at `meteo.arso.gov.si/.../observation_si_latest.xml`. Licence terms are not published alongside the feed and should be confirmed with ARSO before adding |
+  | South Tyrol / Open Data Hub (Italy) | `mobility.api.opendatahub.com/v2/flat/MeteoStation` is live and openly licensed, but the set is road-weather rather than Alpine summit stations and many entries are inactive. No national Italian aggregate was found |
 
 ### Weather: observed lightning density
 
