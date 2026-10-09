@@ -26,6 +26,11 @@ const LIST_BLOCK_IDS = Object.freeze({
   'weather-cyclones': 'storms',
   'alpine-stations': 'stations',
 });
+// Cards whose legend is a set of NAMED bands rather than a numeric scale. The
+// ramp path prints only its two endpoints, which leaves every middle band
+// unexplained when the labels are words ("Calm — Storm" says nothing about the
+// three colours between them).
+const CATEGORICAL_LEGEND_IDS = new Set(['weather-cyclones', 'alpine-stations']);
 const utc = (time) =>
   Number.isFinite(Date.parse(time))
     ? `${new Date(time).toISOString().slice(5, 16).replace('T', ' ')} UTC`
@@ -205,10 +210,10 @@ export function createWeatherPanel({
         id: 'legend',
         type: 'legend',
         legend: {
-          categorical: id === 'weather-cyclones',
+          categorical: CATEGORICAL_LEGEND_IDS.has(id),
           colors: legend.map(({ color }) => color),
           labels: legend.map(({ label }) => label),
-          units: id === 'weather-cyclones' ? '' : summary.units,
+          units: CATEGORICAL_LEGEND_IDS.has(id) ? '' : summary.units,
           zeroIndex: legend.findIndex(({ label }) => label === '0'),
         },
       };
