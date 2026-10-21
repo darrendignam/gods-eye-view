@@ -21,6 +21,7 @@
 export const SLF_NETWORK_ID = 'slf-imis';
 export const SMN_NETWORK_ID = 'meteoswiss-smn';
 export const TAWES_NETWORK_ID = 'geosphere-tawes';
+export const SNOTEL_NETWORK_ID = 'usda-snotel';
 
 export const ALPINE_NETWORKS = Object.freeze([
   Object.freeze({
@@ -78,6 +79,25 @@ export const ALPINE_NETWORKS = Object.freeze([
     parameters: Object.freeze(['snow', 'wind', 'temperature', 'precipitation']),
     cadenceMinutes: 10,
   }),
+  Object.freeze({
+    id: SNOTEL_NETWORK_ID,
+    // i18n-ignore: the operator's own name for the network
+    label: 'SNOTEL',
+    name: 'USDA Natural Resources Conservation Service',
+    country: 'US',
+    homepage: 'https://www.nrcs.usda.gov/wps/portal/wcc/home/',
+    licence: 'Public domain',
+    licenceUrl: 'https://www.usa.gov/government-works',
+    attribution: 'USDA NRCS',
+    // No precipitation. `PREC` is a season-to-date ACCUMULATION, flat across
+    // the hours of a dry day, where every other network here publishes the
+    // depth that fell in one reporting interval. Presenting the two under one
+    // parameter would put a season total on the same scale as ten minutes of
+    // rain. Snow water equivalent (`WTEQ`), which is what SNOTEL exists to
+    // measure, has no canonical field yet either. See ./networks/snotel.js.
+    parameters: Object.freeze(['snow', 'wind', 'temperature']),
+    cadenceMinutes: 60,
+  }),
 ]);
 
 export const ALPINE_NETWORK_IDS = Object.freeze(
@@ -103,10 +123,23 @@ export function networksMeasuring(parameterId) {
  *
  * CC BY is a condition rather than a courtesy, so this credits the operators
  * whose data is on screen and stays silent about the rest.
+ *
+ * The licence is named per GROUP, not once for the line. The networks no
+ * longer share one: SNOTEL is US public domain, and a single trailing
+ * "(CC BY 4.0)" would have asserted a licence NRCS never granted while
+ * implying a condition its data does not carry.
  */
 export function alpineAttribution(networkIds = ALPINE_NETWORK_IDS) {
-  const names = ALPINE_NETWORKS.filter((network) =>
+  const present = ALPINE_NETWORKS.filter((network) =>
     networkIds.includes(network.id),
-  ).map((network) => network.attribution);
-  return names.length ? `${names.join(' · ')} (CC BY 4.0)` : '';
+  );
+  const byLicence = new Map();
+  for (const network of present) {
+    const held = byLicence.get(network.licence) ?? [];
+    held.push(network.attribution);
+    byLicence.set(network.licence, held);
+  }
+  return [...byLicence]
+    .map(([licence, names]) => `${names.join(' · ')} (${licence})`)
+    .join(' · ');
 }

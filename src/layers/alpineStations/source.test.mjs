@@ -106,7 +106,7 @@ test('only a payload that is not an envelope is rejected outright', () => {
   ])
     assert.throws(
       () => readAlpineSnapshot(payload),
-      /Malformed Alpine station snapshot/,
+      /Malformed mountain station snapshot/,
       JSON.stringify(payload),
     );
 });
@@ -188,7 +188,10 @@ test('a non-200 reply reports its status without relaying a body', async () => {
     fetchImpl: () =>
       respond({ error: 'upstream said something' }, { ok: false, status: 502 }),
   });
-  await assert.rejects(() => source.getSnapshot(), /Alpine stations HTTP 502/);
+  await assert.rejects(
+    () => source.getSnapshot(),
+    /Mountain stations HTTP 502/,
+  );
 });
 
 test('an oversized body is refused rather than parsed', async () => {

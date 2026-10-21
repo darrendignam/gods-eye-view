@@ -4,7 +4,7 @@ import { ALPINE_NETWORK_IDS } from './networks.js';
 import { alpineStationRecord } from './records.js';
 
 /**
- * Read the merged Alpine station snapshot from the same-origin proxy.
+ * Read the merged mountain station snapshot from the same-origin proxy.
  *
  * The proxy has already joined and validated every network, so this re-runs
  * the record validator rather than a second parser: the browser must not be
@@ -19,7 +19,7 @@ import { alpineStationRecord } from './records.js';
 /** Ceiling on the merged payload. Measured at ~240 KB for ~650 stations. */
 export const ALPINE_RESPONSE_LIMIT = 8 * 1024 * 1024;
 
-const malformed = () => new Error(msg('Malformed Alpine station snapshot'));
+const malformed = () => new Error(msg('Malformed mountain station snapshot'));
 
 /**
  * Which network this is, and whether it answered.
@@ -65,7 +65,7 @@ export function createAlpineStationSource({
       signal?.throwIfAborted();
       const response = await fetchImpl('/api/alpine-stations', { signal });
       if (!response.ok)
-        throw new Error(`Alpine stations HTTP ${response.status}`);
+        throw new Error(`Mountain stations HTTP ${response.status}`);
       const payload = await readResponseJsonCapped(
         response,
         ALPINE_RESPONSE_LIMIT,

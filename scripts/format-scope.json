@@ -1095,6 +1095,7 @@
   "src/layers/alpineStations/parameters.test.mjs",
   "src/layers/alpineStations/records.test.mjs",
   "src/layers/alpineStations/source.test.mjs",
+  "src/layers/alpineStations/networks/snotel.test.mjs",
   "src/layers/alpineStations/networks/slf.test.mjs",
   "src/layers/alpineStations/networks/smn.test.mjs",
   "src/layers/alpineStations/networks/tawes.test.mjs",

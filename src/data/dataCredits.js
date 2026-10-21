@@ -115,11 +115,13 @@ const alpineDisplays = new WeakMap();
  * fuller text and the coverage caveat.
  */
 export const ALPINE_STATIONS_INLINE_CREDIT =
-  'Alpine stations: ' +
+  'Mountain stations: ' +
   '<a href="https://www.slf.ch/" target="_blank" rel="noopener">WSL Institute for Snow and Avalanche Research SLF</a> · ' +
   '<a href="https://www.meteoswiss.admin.ch/" target="_blank" rel="noopener">MeteoSwiss</a> · ' +
   '<a href="https://data.hub.geosphere.at/" target="_blank" rel="noopener">GeoSphere Austria</a> ' +
-  '(<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>)';
+  '(<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>) · ' +
+  '<a href="https://www.nrcs.usda.gov/wps/portal/wcc/home/" target="_blank" rel="noopener">USDA NRCS</a> ' +
+  '(public domain)';
 
 /** Show the on-globe Alpine station credit. Idempotent per viewer. */
 export function showAlpineStationsCredit(viewer) {
@@ -452,11 +454,14 @@ export const DATA_CREDITS = [
   {
     key: 'alpine-stations',
     html:
-      'Alpine weather stations: ' +
+      'Mountain weather stations: ' +
       '<a href="https://www.slf.ch/" target="_blank" rel="noopener">WSL Institute for Snow and Avalanche Research SLF</a> (IMIS) · ' +
       '<a href="https://www.meteoswiss.admin.ch/" target="_blank" rel="noopener">MeteoSwiss</a> (SwissMetNet) · ' +
       '<a href="https://data.hub.geosphere.at/" target="_blank" rel="noopener">GeoSphere Austria</a> (TAWES), each ' +
-      '<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Measurements only, not avalanche danger ratings.',
+      '<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · ' +
+      '<a href="https://www.nrcs.usda.gov/wps/portal/wcc/home/" target="_blank" rel="noopener">USDA NRCS</a> (SNOTEL), ' +
+      '<a href="https://www.usa.gov/government-works" target="_blank" rel="noopener">US public domain</a>. ' +
+      'Measurements only, not avalanche danger ratings.',
   },
   {
     key: 'weather-cyclones',

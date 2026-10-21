@@ -1,4 +1,4 @@
-# Alpine Stations layer
+# Mountain Stations layer
 
 Design notes and traps for `src/layers/alpineStations/`, its adapters under
 `src/layers/alpineStations/networks/`, and the proxy in
@@ -10,13 +10,15 @@ the layer or adding a network.
 
 ## What the layer is
 
-About 650 automatic weather stations across the Swiss and Austrian Alps, drawn
-as simple markers coloured by one selected measurement, with the readings, the
-legend and the nearest stations in view in a card in the WEATHER rail.
+About 1,600 automatic weather stations across the Swiss and Austrian Alps and
+the US mountain west, drawn as simple markers coloured by one selected
+measurement, with the readings, the legend and the nearest stations in view in
+a card in the WEATHER rail.
 
-Three networks, one adapter each. All three are keyless and CC BY 4.0, which is
-the condition of inclusion: the layer works on a fresh clone with no
-credentials, like USGS earthquakes rather than like TomTom.
+Four networks, one adapter each. Every one is keyless and openly licensed,
+which is the condition of inclusion: the layer works on a fresh clone with no
+credentials, like USGS earthquakes rather than like TomTom. The three European
+networks are CC BY 4.0; SNOTEL is US public domain.
 
 | Network | Stations | Cadence | Publishes |
 |---|---|---|---|
@@ -159,7 +161,7 @@ naked `valid_from`/`valid_to` beside the offsets this reads, so the shape is
 already in the feed; `parseSmnTimestamp` does its own round-trip check on top,
 because VQHA80 carries no offset at all and is known to be Swiss local time.
 
-### Pressure is QFF, and two of the three networks cannot supply it
+### Pressure is QFF, and three of the four networks cannot supply it
 
 Station-level pressure (QFE) is a map of ALTITUDE, not of weather. Measured
 across SwissMetNet, `prestas0` spanned 663-991 hPa on a day whose real synoptic
@@ -232,8 +234,9 @@ present).
 
 ### Quiet markers have to RECEDE, not merely differ
 
-Coverage is uneven by nature, and the thin views are thin: only 175 of ~650
-stations carry a snow sensor, and only 59 publish a sea-level pressure. So in
+Coverage is uneven by nature, and the thin views are thin: measured across the
+Alps alone, only 175 of ~650 stations carry a snow sensor, and only 59 publish
+a sea-level pressure. So in
 those views MOST markers are quiet ones.
 
 Drawn at the same weight as a reading they bury the stations that actually have
@@ -274,7 +277,7 @@ station reports in) is called out in its header.
 
 ## Attribution is on the globe, not only in the lightbox
 
-CC BY is a condition of using all three networks, and SLF's data-service terms
+CC BY is a condition of using the three European networks, and SLF's terms
 go further: *"when displaying, processing or otherwise using the data, there
 must be a clearly visible reference to the data source (WSL Institute for Snow
 and Avalanche Research SLF), in the case of digital products as link
@@ -316,7 +319,7 @@ working vane, and the air is actually moving above `WIND_ARROW_CALM_FLOOR_MS`.
 A vane in still air is reporting noise, and pointing an arrow with it would
 assert a direction the station never really measured.
 
-**The arrow points downwind.** All three networks publish the direction the
+**The arrow points downwind.** Every network publishes the direction the
 wind blows FROM, per the WMO convention, so the arrow is the reverse of the
 published figure. The card and the ambient label keep the meteorological
 reading: "22 km/h W" is wind FROM the west, drawn as an arrow pointing east.
@@ -462,3 +465,67 @@ curl -s -o /dev/null -w '%{content_type}\n' http://localhost:4173/api/alpine-sta
   who tries: `aws.slf.ch/api/bulletin/caaml` and `aws.slf.ch/api/warningregion/`
   both return HTML rather than data when fetched directly, despite being cited
   on SLF's own data-service page. Find the real endpoints first.
+
+## The US network, and what it cost
+
+SNOTEL is the fourth network and the first outside the Alps. It is about 980
+automatic sites across thirteen western states and Alaska, median elevation
+2,280 m, hourly, keyless and in the US public domain. Adding it exercised the
+five steps above and changed four things the Alps alone never exposed.
+
+### Not every open licence is CC BY
+
+The registry's licence invariant asserted `CC BY 4.0` exactly. US federal data
+is public domain, which is strictly more permissive but not that string, so the
+test now holds an allowlist of licences a network may carry. The on-globe and
+lightbox credits name NRCS separately from the three CC BY operators, because
+one trailing "(CC BY 4.0)" covering all four would be false.
+
+Public-domain data imposes no attribution condition at all. NRCS is credited
+anyway: the map should say where a reading came from whether or not a licence
+compels it.
+
+### The readings are imperial
+
+SNOTEL is the only network here that needs converting: inches, degrees
+Fahrenheit, miles per hour, and feet for the site elevation. The conversions
+live in the adapter, so nothing downstream knows. A silent failure here shows
+up as plausible-but-wrong rather than as an error, which is why the adapter's
+tests assert against figures cut from a live response rather than round
+numbers.
+
+### The timestamps carry no offset, and the offset is not constant
+
+AWDB publishes `2026-10-21 00:00` with no zone, in the station's own STANDARD
+time all year. `dataTimeZone` is -8 for the lower 48 and **-9 for the 86
+Alaskan sites**, and it does not shift for daylight saving. Assuming one zone
+puts Alaska an hour out; assuming UTC puts the whole network up to nine hours
+out, which against the staleness floor reports a healthy network as offline.
+`isoOrNull` refuses an offsetless datetime for exactly this reason, so
+`snotelInstant` applies the station's own offset where the station is in hand.
+
+### The API's own filter does not filter
+
+`networkCodes=SNTL` is accepted and ignored. Asking for SNOTEL returned all
+4,398 stations across twelve networks — USGS gauges, manual snow courses, COOP
+climate sites — and the only reason it was caught is that 49 states is absurd
+for a western network. The adapter filters on `networkCode` itself, and
+`stationTriplets=*:<state>:SNTL` is what actually scopes the request.
+
+There is a second limit behind the same endpoint: **1000 station elements per
+request**, returned as a plain 400. Five elements across 980 sites is roughly
+4,900, so the read is split per state, which is also what the wildcard triplet
+understands.
+
+### Two elements are read and dropped
+
+`PREC` is a season-to-date accumulation, flat across the hours of a dry day,
+where every other network publishes the depth that fell in one interval.
+Presenting them under one parameter would put a winter's total on the same
+colour scale as ten minutes of rain, so the registry declares no precipitation
+for SNOTEL.
+
+`WTEQ` is snow water equivalent, which is what SNOTEL exists to measure and the
+reading a hydrologist would come for. There is no canonical field for it, and
+adding one means a new parameter view, its own bands and legend, and every
+other network declaring it absent. It is deliberately left for its own change.

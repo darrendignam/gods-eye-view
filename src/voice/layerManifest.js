@@ -215,6 +215,7 @@ const layers = [
   {
     id: 'alpine-stations',
     aliases: [
+      'mountain stations',
       'alpine stations',
       'weather stations',
       'mountain weather',
@@ -222,6 +223,7 @@ const layers = [
       'snow stations',
       'slf',
       'swissmetnet',
+      'snotel',
     ],
     context: false,
     query: {

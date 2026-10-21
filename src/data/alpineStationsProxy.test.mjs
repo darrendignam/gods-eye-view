@@ -13,10 +13,13 @@ import {
   observationCacheMs,
   SLF_MEASUREMENTS_URL,
   SLF_STATIONS_URL,
+  SNOTEL_BASE,
   SMN_METADATA_URL,
   SMN_OBSERVATIONS_URL,
   TAWES_METADATA_URL,
   TAWES_STATIONS_PER_REQUEST,
+  UPSTREAM_TIMEOUT_MS,
+  upstreamTimeoutMs,
 } from '../../server/providers/alpine-stations/upstreams.js';
 import { tawesObservationUrl } from '../../server/providers/alpine-stations/fetchers.js';
 import {
@@ -24,6 +27,7 @@ import {
   alpineNetwork,
   SLF_NETWORK_ID,
   SMN_NETWORK_ID,
+  SNOTEL_NETWORK_ID,
   TAWES_NETWORK_ID,
 } from '../layers/alpineStations/networks.js';
 
@@ -33,6 +37,8 @@ const SLF_CACHE_MS = observationCacheMs(
 import {
   SLF_MEASUREMENTS,
   SLF_STATIONS,
+  SNOTEL_DATA,
+  SNOTEL_STATIONS,
   SMN_METADATA_CSV,
   SMN_OBSERVATIONS_CSV,
   TAWES_METADATA,
@@ -54,6 +60,21 @@ function bytesResponse(bytes) {
     headers: { 'content-length': String(bytes.byteLength) },
   });
 }
+
+/** A real Alaskan site whose own data request answers 500. */
+const POISONED_SNOTEL = {
+  stationTriplet: '1302:AK:SNTL',
+  name: 'Creamers Field',
+  stateCode: 'AK',
+  networkCode: 'SNTL',
+  latitude: 64.8686,
+  longitude: -147.7363,
+  elevation: 456.0,
+  countyName: 'Fairbanks North Star',
+  dataTimeZone: -9.0,
+  beginDate: '2015-10-01 00:00',
+  endDate: '2100-01-01 00:00',
+};
 
 const textResponse = (body) => bytesResponse(new TextEncoder().encode(body));
 const jsonResponse = (value) => textResponse(JSON.stringify(value));
@@ -84,6 +105,29 @@ function harness({ fail = new Set(), clock = { value: NOW } } = {}) {
     if (url === TAWES_METADATA_URL) return jsonResponse(TAWES_METADATA);
     if (url.startsWith('https://dataset.api.hub.geosphere.at/'))
       return jsonResponse(TAWES_OBSERVATIONS);
+    // SNOTEL is read a state at a time; the fixture stands in for Colorado
+    // and every other state answers empty, which is what a state with no
+    // sites of its own would really return.
+    if (url.startsWith(`${SNOTEL_BASE}/stations`)) {
+      // Colorado stands in for the network; the poisoned Alaskan site is
+      // added so the data path has something it cannot read.
+      if (url.includes('%3ACO%3A')) return jsonResponse(SNOTEL_STATIONS);
+      if (url.includes('%3AAK%3A')) return jsonResponse([POISONED_SNOTEL]);
+      return jsonResponse([]);
+    }
+    if (url.startsWith(`${SNOTEL_BASE}/data`)) {
+      // One station the API cannot serve poisons whatever request it is in:
+      // `1302:AK:SNTL` answers 500 on its own and took all 86 Alaskan sites
+      // with it. The fixture reproduces that, so the splitting is exercised.
+      if (url.includes('1302%3AAK%3ASNTL'))
+        throw new Error('upstream exploded with a detailed internal message');
+      const asked = new URL(url).searchParams.get('stationTriplets') ?? '';
+      return jsonResponse(
+        SNOTEL_DATA.filter((entry) =>
+          asked.split(',').includes(entry.stationTriplet),
+        ),
+      );
+    }
     throw new Error(`unexpected upstream: ${url}`);
   };
   const plugin = alpineStationsProxy({
@@ -153,7 +197,7 @@ test('every network is joined and credited in one response', async () => {
   assert.ok(payload.fetchedAt, 'the newest read is dated');
   assert.ok(payload.stations.length >= 7);
   assert.match(payload.attribution, /CC BY 4\.0/);
-  for (const fragment of ['SLF', 'MeteoSwiss', 'GeoSphere'])
+  for (const fragment of ['SLF', 'MeteoSwiss', 'GeoSphere', 'NRCS'])
     assert.ok(payload.attribution.includes(fragment), fragment);
   // Only the fixed upstreams are ever contacted.
   for (const url of calls)
@@ -162,6 +206,7 @@ test('every network is joined and credited in one response', async () => {
         'measurement-api.slf.ch',
         'data.geo.admin.ch',
         'dataset.api.hub.geosphere.at',
+        'wcc.sc.egov.usda.gov',
       ].some((host) => url.includes(host)),
       url,
     );
@@ -355,6 +400,7 @@ test('every network down answers 200 with an honest envelope', async () => {
       'measurement-api.slf.ch',
       'data.geo.admin.ch',
       'dataset.api.hub.geosphere.at',
+      'wcc.sc.egov.usda.gov',
     ]),
   });
   const payload = await json();
@@ -536,4 +582,49 @@ test('the serve-stale ceiling binds during the cooldown as well as after it', ()
         'and none of its stations reach the client',
       );
     });
+});
+
+test('one station the upstream cannot serve costs only itself', async () => {
+  // AWDB answers 500 for `1302:AK:SNTL` and for any request containing it,
+  // saying nothing about which station it choked on. Read as one wildcard per
+  // state, that single site blanked all 86 Alaskan ones. The chunk is halved
+  // until the failure is isolated, so the rest of the network still arrives.
+  const { json, calls } = harness();
+  const payload = await json();
+  const snotel = payload.stations.filter(
+    (station) => station.networkId === SNOTEL_NETWORK_ID,
+  );
+  assert.ok(snotel.length >= 3, 'the healthy sites still arrive');
+  const healthy = snotel.filter((station) => station.measuredAt);
+  assert.ok(healthy.length >= 3, 'with their readings');
+  // The unreadable site is still LISTED and simply has no readings, which is
+  // how every silent station is treated: it exists, so hiding it would say
+  // the network is smaller than it is. It draws offline.
+  const poisoned = snotel.find((station) => station.code === 'AK-1302');
+  assert.ok(poisoned, 'the site is still part of the network');
+  assert.equal(poisoned.measuredAt, null);
+  assert.equal(poisoned.airTempC, null);
+  // The Alaskan site is still LISTED, so it was asked for and then isolated:
+  // the split happened rather than the whole state being skipped.
+  const asked = calls.filter((url) => url.includes('/data'));
+  assert.ok(
+    asked.some((url) => url.includes('1302%3AAK%3ASNTL')),
+    'the poisoned station was actually attempted',
+  );
+  assert.equal(
+    payload.networks.find((n) => n.id === SNOTEL_NETWORK_ID).status,
+    'ok',
+    'and one unreadable station does not make the network unavailable',
+  );
+});
+
+test('a slow network gets its own wait budget, not the shared one', () => {
+  // SNOTEL is about seven requests against a slow endpoint and takes roughly
+  // 30s against the live API, where the shared 25s ceiling cut it off and
+  // reported the whole network unavailable. Raising the shared ceiling would
+  // have let a stuck European upstream hold a request twice as long.
+  assert.ok(upstreamTimeoutMs(SNOTEL_NETWORK_ID) > UPSTREAM_TIMEOUT_MS);
+  for (const id of [SLF_NETWORK_ID, SMN_NETWORK_ID, TAWES_NETWORK_ID])
+    assert.equal(upstreamTimeoutMs(id), UPSTREAM_TIMEOUT_MS, id);
+  assert.equal(upstreamTimeoutMs('not-a-network'), UPSTREAM_TIMEOUT_MS);
 });

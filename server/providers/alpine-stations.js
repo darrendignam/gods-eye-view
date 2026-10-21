@@ -1,9 +1,9 @@
 /**
- * Alpine automatic weather stations — a bounded relay for three keyless,
+ * Mountain automatic weather stations — a bounded relay for four keyless,
  * openly licensed national networks.
  *
- * It exists because none of the three upstreams can be called from the browser
- * and each needs more than one round trip to be useful:
+ * It exists because none of the upstreams can be called from the browser and
+ * each needs more than one round trip to be useful:
  *
  *   SLF IMIS     measurement-api.slf.ch sends no CORS headers at all, and the
  *                measurements endpoint returns the whole network's rolling
@@ -12,12 +12,15 @@
  *                which is ISO-8859-1.
  *   TAWES        observations require an explicit station id list, which only
  *                the metadata response can supply.
+ *   SNOTEL       stations and readings are two endpoints, keyed by a triplet
+ *                the station call alone can supply, and one bad station fails
+ *                any request it travels in.
  *
- * Doing that work here means the client receives ~650 ready-to-render records
- * instead of four megabytes it would have to join itself.
+ * Doing that work here means the client receives ~1,600 ready-to-render
+ * records instead of several megabytes it would have to join itself.
  *
- * One network being down must never blank the layer, so the three are acquired
- * independently and the response reports each one's state. A visitor in the
+ * One network being down must never blank the layer, so each is acquired
+ * independently and the response reports its own state. A visitor in the
  * Austrian Alps keeps a map when a Swiss research API is in maintenance.
  */
 
@@ -32,6 +35,7 @@ import { clientKey, makeRateLimiter } from './common/rate-limit.js';
 import {
   fetchSlfStations,
   fetchSmnStations,
+  fetchSnotelStations,
   fetchTawesStations,
   createUpstreamReader,
 } from './alpine-stations/fetchers.js';
@@ -40,6 +44,7 @@ import {
   METADATA_CACHE_MS,
   observationCacheMs,
   UPSTREAM_TIMEOUT_MS,
+  upstreamTimeoutMs,
 } from './alpine-stations/upstreams.js';
 
 /** Reject as soon as the caller goes away, without disturbing `promise`. */
@@ -60,6 +65,7 @@ const FETCHERS = Object.freeze({
   'slf-imis': fetchSlfStations,
   'meteoswiss-smn': fetchSmnStations,
   'geosphere-tawes': fetchTawesStations,
+  'usda-snotel': fetchSnotelStations,
 });
 
 /** Wait before retrying a network that just failed, so a dead host is not hammered. */
@@ -68,7 +74,7 @@ export const RETRY_AFTER_FAILURE_MS = 60_000;
 export const ALPINE_STATIONS_ROUTE = '/api/alpine-stations';
 
 /**
- * Relay the Alpine station networks on a fixed, bounded, cached route.
+ * Relay the mountain station networks on a fixed, bounded, cached route.
  *
  * `fetchImpl` and `now` are injected so the whole thing is testable without a
  * socket or a clock.
@@ -90,13 +96,22 @@ export function alpineStationsProxy({
    * every few minutes. The loader runs only when the entry has expired, so a
    * metadata outage cannot stop readings from being served.
    */
+  /**
+   * Read a network's identity data, held far longer than its readings.
+   *
+   * `key` separates several identity reads within one network. SNOTEL reads a
+   * station list per state, and without the key each state overwrote the last;
+   * caching them as one value instead meant a single state failing while the
+   * cache was cold left it missing for the whole metadata window.
+   */
   function metadataReader(networkId) {
-    return async (load) => {
-      const held = metadata.get(networkId);
+    return async (load, key = '') => {
+      const slot = key ? `${networkId}:${key}` : networkId;
+      const held = metadata.get(slot);
       if (held && now() - held.at < METADATA_CACHE_MS) return held.value;
       try {
         const value = await load();
-        metadata.set(networkId, { value, at: now() });
+        metadata.set(slot, { value, at: now() });
         return value;
       } catch (error) {
         if (held) return held.value;
@@ -143,7 +158,14 @@ export function alpineStationsProxy({
     // rather than each opening their own copy of a three-megabyte read.
     const shared = coalesceProxyRequest(inFlight, networkId, () => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      // Per network: SNOTEL is several requests against a slow endpoint and
+      // needs more than the European feeds, which should not inherit its
+      // patience. An explicit `timeoutMs` option still overrides both.
+      const budget =
+        timeoutMs === UPSTREAM_TIMEOUT_MS
+          ? upstreamTimeoutMs(networkId)
+          : timeoutMs;
+      const timer = setTimeout(() => controller.abort(), budget);
       return refresh(networkId, controller.signal).finally(() =>
         clearTimeout(timer),
       );
@@ -239,7 +261,7 @@ export function alpineStationsProxy({
         fetchedAt: null,
         stale: false,
         unavailable: true,
-        reason: 'Alpine station networks unavailable',
+        reason: 'Mountain station networks unavailable',
       });
     } finally {
       res.removeListener?.('close', close);

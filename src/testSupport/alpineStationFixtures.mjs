@@ -395,3 +395,113 @@ export const TAWES_OBSERVATIONS = {
     },
   ],
 };
+
+/**
+ * NRCS AWDB `/stations`, CUT FROM A LIVE RESPONSE on 2026-10-21.
+ *
+ * Three Colorado SNOTEL sites chosen for what they are missing, not for being
+ * typical: Arapaho Ridge carries every sensor, Alta Lakes has no wind mast,
+ * and Berthoud Summit has no snow-depth sensor at all. `elevation` is FEET and
+ * `dataTimeZone` is the station's own standard-time offset, which is -8 for
+ * the lower 48 and -9 in Alaska.
+ */
+export const SNOTEL_STATIONS = [
+  {
+    stationTriplet: '1030:CO:SNTL',
+    name: 'Arapaho Ridge',
+    stateCode: 'CO',
+    networkCode: 'SNTL',
+    latitude: 40.35098,
+    longitude: -106.38141,
+    elevation: 10960.0,
+    countyName: 'Grand',
+    dataTimeZone: -8.0,
+    beginDate: '2002-08-01 00:00',
+    endDate: '2100-01-01 00:00',
+  },
+  {
+    stationTriplet: '1344:CO:SNTL',
+    name: 'Alta Lakes',
+    stateCode: 'CO',
+    networkCode: 'SNTL',
+    latitude: 37.88929,
+    longitude: -107.84484,
+    elevation: 11290.0,
+    countyName: 'San Miguel',
+    dataTimeZone: -8.0,
+    beginDate: '2025-09-25 00:00',
+    endDate: '2100-01-01 00:00',
+  },
+  {
+    stationTriplet: '335:CO:SNTL',
+    name: 'Berthoud Summit',
+    stateCode: 'CO',
+    networkCode: 'SNTL',
+    latitude: 39.80364,
+    longitude: -105.77786,
+    elevation: 11300.0,
+    countyName: 'Grand',
+    dataTimeZone: -8.0,
+    beginDate: '1963-09-01 00:00',
+    endDate: '2100-01-01 00:00',
+  },
+];
+
+/**
+ * NRCS AWDB `/data`, the same three stations, same live response.
+ *
+ * Units are the API's own `storedUnitCode`: inches, degrees Fahrenheit and
+ * miles per hour. Arapaho Ridge is the case that matters most — a calm, bare
+ * station reading exactly 0 for wind speed, wind direction AND snow depth,
+ * where treating absent as zero would be invisible.
+ */
+export const SNOTEL_DATA = [
+  {
+    stationTriplet: '1030:CO:SNTL',
+    data: [
+      el('RHUM', 'pct', 2, 91.0),
+      el('SNWD', 'in', 0, 0),
+      el('TOBS', 'degF', 1, 31.5),
+      el('WDIRV', 'degree', 0, 0),
+      el('WSPDV', 'mph', 1, 0.0),
+      el('WTEQ', 'in', 1, 0.2),
+    ],
+  },
+  {
+    stationTriplet: '1344:CO:SNTL',
+    data: [
+      el('SNWD', 'in', 0, 4),
+      el('TOBS', 'degF', 1, 36.9),
+      el('WTEQ', 'in', 1, 1.6),
+    ],
+  },
+  {
+    stationTriplet: '335:CO:SNTL',
+    data: [
+      el('RHUM', 'pct', 2, 70.0),
+      el('TOBS', 'degF', 1, 31.5),
+      el('WDIRV', 'degree', 0, 65),
+      el('WSPDV', 'mph', 1, 1.1),
+      el('WTEQ', 'in', 1, 0.1),
+    ],
+  },
+];
+
+/** One AWDB element block, in the envelope shape the API really returns. */
+function el(elementCode, storedUnitCode, dataPrecision, value) {
+  return {
+    stationElement: {
+      elementCode,
+      ordinal: 1,
+      durationName: 'HOURLY',
+      dataPrecision,
+      storedUnitCode,
+      originalUnitCode: storedUnitCode,
+      beginDate: '2002-08-14 06:00',
+      endDate: '2100-01-01 00:00',
+      derivedData: false,
+    },
+    // The API returns the window asked for; the adapter takes the newest.
+    values: [{ date: '2026-10-21 00:00', value }],
+  };
+}
