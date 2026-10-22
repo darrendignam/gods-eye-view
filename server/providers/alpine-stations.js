@@ -1,5 +1,5 @@
 /**
- * Mountain automatic weather stations — a bounded relay for four keyless,
+ * Mountain automatic weather stations, a bounded relay for five keyless,
  * openly licensed national networks.
  *
  * It exists because none of the upstreams can be called from the browser and
@@ -15,8 +15,11 @@
  *   SNOTEL       stations and readings are two endpoints, keyed by a triplet
  *                the station call alone can supply, and one bad station fails
  *                any request it travels in.
+ *   ECCC SWOB    the readings live in a 13.9-million-item archive that has to
+ *                be reduced to the newest observation per station, which is
+ *                about 5,300 features to join against three station lists.
  *
- * Doing that work here means the client receives ~1,600 ready-to-render
+ * Doing that work here means the client receives ~1,700 ready-to-render
  * records instead of several megabytes it would have to join itself.
  *
  * One network being down must never blank the layer, so each is acquired
@@ -33,6 +36,7 @@ import { mergeNetworkStations } from '../../src/layers/alpineStations/records.js
 import { coalesceProxyRequest } from './common/http.js';
 import { clientKey, makeRateLimiter } from './common/rate-limit.js';
 import {
+  fetchEcccStations,
   fetchSlfStations,
   fetchSmnStations,
   fetchSnotelStations,
@@ -66,6 +70,7 @@ const FETCHERS = Object.freeze({
   'meteoswiss-smn': fetchSmnStations,
   'geosphere-tawes': fetchTawesStations,
   'usda-snotel': fetchSnotelStations,
+  'eccc-swob': fetchEcccStations,
 });
 
 /** Wait before retrying a network that just failed, so a dead host is not hammered. */

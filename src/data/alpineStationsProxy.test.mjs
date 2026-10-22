@@ -7,6 +7,8 @@ import {
   alpineStationsProxy,
 } from '../../server/providers/alpine-stations.js';
 import {
+  ECCC_COLLECTIONS,
+  ECCC_OBSERVATION_WINDOW_MS,
   MAX_SERVE_STALE_MS,
   METADATA_CACHE_MS,
   OBSERVATION_CACHE_MS,
@@ -21,9 +23,13 @@ import {
   UPSTREAM_TIMEOUT_MS,
   upstreamTimeoutMs,
 } from '../../server/providers/alpine-stations/upstreams.js';
-import { tawesObservationUrl } from '../../server/providers/alpine-stations/fetchers.js';
+import {
+  ecccObservationsUrl,
+  tawesObservationUrl,
+} from '../../server/providers/alpine-stations/fetchers.js';
 import {
   ALPINE_NETWORK_IDS,
+  ECCC_NETWORK_ID,
   alpineNetwork,
   SLF_NETWORK_ID,
   SMN_NETWORK_ID,
@@ -35,6 +41,8 @@ const SLF_CACHE_MS = observationCacheMs(
   alpineNetwork(SLF_NETWORK_ID).cadenceMinutes,
 );
 import {
+  ECCC_OBSERVATIONS,
+  ECCC_STATIONS,
   SLF_MEASUREMENTS,
   SLF_STATIONS,
   SNOTEL_DATA,
@@ -128,6 +136,23 @@ function harness({ fail = new Set(), clock = { value: NOW } } = {}) {
         ),
       );
     }
+    // SWOB is three station lists and one observation window. Each province
+    // is answered with the stations the fixture places in it, so a fetcher
+    // that asked for the wrong province would come back empty.
+    if (url.startsWith(`${ECCC_COLLECTIONS}/swob-stations`)) {
+      const province = new URL(url).searchParams.get('province_territory');
+      return jsonResponse({
+        type: 'FeatureCollection',
+        numberMatched: ECCC_STATIONS.filter(
+          (feature) => feature.properties.province_territory === province,
+        ).length,
+        features: ECCC_STATIONS.filter(
+          (feature) => feature.properties.province_territory === province,
+        ),
+      });
+    }
+    if (url.startsWith(`${ECCC_COLLECTIONS}/swob-realtime`))
+      return jsonResponse(ECCC_OBSERVATIONS);
     throw new Error(`unexpected upstream: ${url}`);
   };
   const plugin = alpineStationsProxy({
@@ -197,7 +222,13 @@ test('every network is joined and credited in one response', async () => {
   assert.ok(payload.fetchedAt, 'the newest read is dated');
   assert.ok(payload.stations.length >= 7);
   assert.match(payload.attribution, /CC BY 4\.0/);
-  for (const fragment of ['SLF', 'MeteoSwiss', 'GeoSphere', 'NRCS'])
+  for (const fragment of [
+    'SLF',
+    'MeteoSwiss',
+    'GeoSphere',
+    'NRCS',
+    'Environment and Climate Change Canada',
+  ])
     assert.ok(payload.attribution.includes(fragment), fragment);
   // Only the fixed upstreams are ever contacted.
   for (const url of calls)
@@ -207,6 +238,7 @@ test('every network is joined and credited in one response', async () => {
         'data.geo.admin.ch',
         'dataset.api.hub.geosphere.at',
         'wcc.sc.egov.usda.gov',
+        'api.weather.gc.ca',
       ].some((host) => url.includes(host)),
       url,
     );
@@ -401,6 +433,7 @@ test('every network down answers 200 with an honest envelope', async () => {
       'data.geo.admin.ch',
       'dataset.api.hub.geosphere.at',
       'wcc.sc.egov.usda.gov',
+      'api.weather.gc.ca',
     ]),
   });
   const payload = await json();
@@ -627,4 +660,135 @@ test('a slow network gets its own wait budget, not the shared one', () => {
   for (const id of [SLF_NETWORK_ID, SMN_NETWORK_ID, TAWES_NETWORK_ID])
     assert.equal(upstreamTimeoutMs(id), UPSTREAM_TIMEOUT_MS, id);
   assert.equal(upstreamTimeoutMs('not-a-network'), UPSTREAM_TIMEOUT_MS);
+});
+
+test('SWOB is read one province at a time, and each list is cached alone', async () => {
+  // Cached together, a single province failing on a cold cache would leave it
+  // missing for the whole metadata window, which is what cost Arizona a day
+  // on the US network.
+  const { json, calls, clock } = harness();
+  await json();
+  const provinces = calls
+    .filter((url) => url.includes('/swob-stations/'))
+    .map((url) => new URL(url).searchParams.get('province_territory'));
+  assert.deepEqual(provinces.sort(), ['Alberta', 'British Columbia', 'Yukon']);
+  for (const url of calls.filter((u) => u.includes('/swob-stations/'))) {
+    const params = new URL(url).searchParams;
+    assert.equal(params.get('data_provider'), 'MSC');
+    assert.equal(params.get('f'), 'json');
+  }
+  // The readings refresh inside the metadata window; the station lists do not.
+  clock.value += observationCacheMs(
+    alpineNetwork(ECCC_NETWORK_ID).cadenceMinutes,
+  );
+  await json();
+  assert.equal(
+    calls.filter((url) => url.includes('/swob-stations/')).length,
+    3,
+    'identity is held for a day',
+  );
+  assert.equal(
+    calls.filter((url) => url.includes('/swob-realtime/')).length,
+    2,
+    'the readings are re-read',
+  );
+});
+
+test('the SWOB observation window is bounded, newest first, and in scope', async () => {
+  // `swob-realtime` is a 13.9-million-item archive of the whole country. The
+  // datetime window and the bbox are the only things bounding this read, and
+  // the sort is what makes a truncated response lose old duplicates instead
+  // of current readings.
+  const params = new URL(ecccObservationsUrl(NOW)).searchParams;
+  assert.equal(
+    params.get('datetime'),
+    `${new Date(NOW - ECCC_OBSERVATION_WINDOW_MS).toISOString()}/..`,
+  );
+  // An hour plus publication slack: about ninety stations publish every
+  // minute and the rest once an hour, on the hour.
+  assert.ok(ECCC_OBSERVATION_WINDOW_MS > 60 * 60 * 1000);
+  assert.equal(params.get('sortby'), '-date_tm-value');
+  assert.equal(params.get('skipGeometry'), 'true');
+  assert.deepEqual(
+    params.get('bbox').split(',').map(Number),
+    [-141, 48, -110, 70],
+  );
+  assert.ok(Number(params.get('limit')) >= 10_000);
+  // The position is identity and comes from the station call, so the window
+  // asks for columns rather than geometry.
+  assert.ok(params.get('properties').includes('msc_id-value'));
+  assert.ok(!params.get('properties').includes('stn_pres'));
+});
+
+test('a Canadian station arrives joined, metric and without a pressure', async () => {
+  const { json } = harness();
+  const payload = await json();
+  const canadian = payload.stations.filter(
+    (station) => station.networkId === ECCC_NETWORK_ID,
+  );
+  assert.equal(canadian.length, 7, 'the two out-of-scope features are dropped');
+  const nakiska = canadian.find((station) => station.code === '305MGFF');
+  assert.equal(nakiska.label, 'NAKISKA RIDGETOP');
+  assert.equal(nakiska.region, 'AB');
+  assert.equal(nakiska.country, 'CA');
+  assert.equal(Math.round(nakiska.elevationM), 2450);
+  // 43.3 km/h as the layer stores it, and back to 43.3 on the card.
+  assert.equal(Math.round(nakiska.windSpeedMs * 36) / 10, 43.3);
+  for (const station of canadian)
+    assert.equal(station.pressureQffHpa, null, station.code);
+  assert.match(payload.attribution, /Environment and Climate Change Canada/);
+});
+
+test('a province list that came back truncated is refused, not used', async () => {
+  // `numberMatched` is the collection's own count. A province quietly
+  // arriving one page deep would drop stations with every gate still green,
+  // so a short page is treated as a failure of that province alone.
+  const calls = [];
+  const plugin = alpineStationsProxy({
+    now: () => NOW,
+    fetchImpl: async (url) => {
+      calls.push(url);
+      if (url.startsWith(`${ECCC_COLLECTIONS}/swob-stations`)) {
+        const province = new URL(url).searchParams.get('province_territory');
+        const features = ECCC_STATIONS.filter(
+          (feature) => feature.properties.province_territory === province,
+        );
+        return jsonResponse({
+          type: 'FeatureCollection',
+          // One more than arrived: the response is a page, not the list.
+          numberMatched: features.length + 1,
+          features,
+        });
+      }
+      if (url.startsWith(`${ECCC_COLLECTIONS}/swob-realtime`))
+        return jsonResponse(ECCC_OBSERVATIONS);
+      throw new Error('upstream exploded with a detailed internal message');
+    },
+  });
+  const routes = new Map();
+  plugin.configureServer({
+    middlewares: { use: (route, handler) => routes.set(route, handler) },
+  });
+  const payload = await new Promise((resolve) => {
+    const res = {
+      destroyed: false,
+      once() {},
+      removeListener() {},
+      writeHead() {},
+      end: (body) => resolve(JSON.parse(body)),
+    };
+    routes.get(ALPINE_STATIONS_ROUTE)(
+      { url: '/', method: 'GET', socket: { remoteAddress: '127.0.0.1' } },
+      res,
+    );
+  });
+  assert.equal(
+    payload.networks.find((network) => network.id === ECCC_NETWORK_ID).status,
+    'unavailable',
+  );
+  assert.ok(
+    !payload.stations.some((station) => station.networkId === ECCC_NETWORK_ID),
+  );
+  // And the window is never read for a station list that cannot be trusted.
+  assert.ok(!calls.some((url) => url.includes('/swob-realtime/')));
 });

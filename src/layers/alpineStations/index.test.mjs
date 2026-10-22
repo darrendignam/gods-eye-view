@@ -700,7 +700,7 @@ test('the card badge names each country once, not once per network', () => {
   // "CH · CH · AT". The order follows the registry, not the alphabet.
   const { layer } = build();
   layer.enable();
-  assert.equal(layer.getRowControls().summary.coverage, 'CH · AT · US');
+  assert.equal(layer.getRowControls().summary.coverage, 'CH · AT · US · CA');
 });
 
 test('a network that did not answer is not named as a source for a reading', async () => {

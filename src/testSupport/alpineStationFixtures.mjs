@@ -505,3 +505,244 @@ function el(elementCode, storedUnitCode, dataPrecision, value) {
     values: [{ date: '2026-10-21 00:00', value }],
   };
 }
+
+/**
+ * ECCC `swob-stations`, CUT FROM LIVE RESPONSES on 2026-10-22.
+ *
+ * Seven stations chosen for what they exercise rather than for being typical:
+ *
+ *   BANFF CS                minute cadence, three observations in the window
+ *   NAKISKA RIDGETOP        the highest site at 2,450 m, hourly, so no snow
+ *                           depth and no ten-minute precipitation
+ *   CALGARY INT'L CS        publishes -1 cm of snow, which the record floors
+ *   OLD CROW RCS            15 cm of snow in Yukon
+ *   VERNON AUTO             newest file has no wind direction and the one six
+ *                           minutes back does, so the column is filled
+ *   TSAWWASSEN FERRY AUTO   newest file has no wind at all and the nearest
+ *                           that does is 25 minutes back, so it stays absent
+ *   SATURNA CAPMON          in the station list with no observation at all
+ *
+ * The last two entries come from the UNFILTERED station response, which the
+ * fetcher never asks for, so the province and provider guards are exercised
+ * against real rows: a NAV CANADA aerodrome inside the Cordillera, and an MSC
+ * station in Ontario.
+ */
+export const ECCC_STATIONS = [
+  stationFeature(
+    '3050519',
+    'BANFF CS',
+    'Alberta',
+    'MSC',
+    [-115.55249, 51.193404, 1397.747],
+  ),
+  stationFeature(
+    '305MGFF',
+    'NAKISKA RIDGETOP',
+    'Alberta',
+    'MSC',
+    [-115.191165, 50.943843, 2449.602],
+  ),
+  stationFeature(
+    '3031094',
+    "CALGARY INT'L CS",
+    'Alberta',
+    'MSC',
+    [-114.000258, 51.109308, 1082.87],
+  ),
+  stationFeature(
+    '2100805',
+    'OLD CROW RCS',
+    'Yukon',
+    'MSC',
+    [-139.844928, 67.567923, 250.662],
+  ),
+  stationFeature(
+    '1128582',
+    'VERNON AUTO',
+    'British Columbia',
+    'MSC',
+    [-119.1936, 50.2233, 484.0],
+  ),
+  stationFeature(
+    '1108291',
+    'TSAWWASSEN FERRY AUTO',
+    'British Columbia',
+    'MSC',
+    [-123.1333, 49.0039, 8.3],
+  ),
+  stationFeature(
+    '1017099',
+    'SATURNA CAPMON',
+    'British Columbia',
+    'MSC',
+    [-123.128286, 48.775203, 179.5],
+  ),
+  stationFeature(
+    '1060815',
+    'Bella Bella Campbell Island',
+    'British Columbia',
+    'NAV CANADA',
+    [-128.157, 52.1851, 43.0],
+  ),
+  stationFeature(
+    '6150690',
+    'BELLEVILLE QUINTE',
+    'Ontario',
+    'MSC',
+    [-77.439842, 44.159363, 95.7],
+  ),
+];
+
+/**
+ * ECCC `swob-realtime`, the same live window, trimmed to the properties the
+ * fetcher asks for and with `sortby=-date_tm-value` deliberately UNDONE.
+ *
+ * The live response arrives newest first. These rows are laid out of order on
+ * purpose, because nothing may depend on that ordering: the adapter sorts per
+ * station, and a reader that trusted the response order would take Banff's
+ * 09:16 reading as current.
+ *
+ * The Parks Canada feature is in the same bbox and has no entry in the MSC
+ * station list, which is how a partner network leaves the layer.
+ */
+export const ECCC_OBSERVATIONS = {
+  type: 'FeatureCollection',
+  numberMatched: 5274,
+  features: [
+    observationFeature({
+      'msc_id-value': '3050519',
+      'date_tm-value': '2026-10-22T09:16:00.000Z',
+      air_temp: 2.8,
+      snw_dpth: 0,
+      rel_hum: 61,
+      pcpn_amt_pst10mts: 0,
+      avg_wnd_spd_10m_pst10mts: 9.8,
+      max_wnd_spd_10m_pst10mts: 15.5,
+      avg_wnd_dir_10m_pst10mts: 195,
+    }),
+    observationFeature({
+      'msc_id-value': '3050519',
+      'date_tm-value': '2026-10-22T10:19:00.000Z',
+      air_temp: 2.3,
+      snw_dpth: 0,
+      rel_hum: 64,
+      pcpn_amt_pst10mts: 0,
+      avg_wnd_spd_10m_pst10mts: 8.2,
+      max_wnd_spd_10m_pst10mts: 13.8,
+      avg_wnd_dir_10m_pst10mts: 198,
+    }),
+    observationFeature({
+      'msc_id-value': '3050519',
+      'date_tm-value': '2026-10-22T10:18:00.000Z',
+      air_temp: 2.3,
+      snw_dpth: 0,
+      rel_hum: 64,
+      pcpn_amt_pst10mts: 0,
+      avg_wnd_spd_10m_pst10mts: 8.3,
+      max_wnd_spd_10m_pst10mts: 13.8,
+      avg_wnd_dir_10m_pst10mts: 197,
+    }),
+    observationFeature({
+      'msc_id-value': '305MGFF',
+      'date_tm-value': '2026-10-22T10:00:00.000Z',
+      air_temp: 3.2,
+      rel_hum: 50,
+      avg_wnd_spd_10m_pst10mts: 43.3,
+      max_wnd_spd_10m_pst10mts: 66.9,
+      avg_wnd_dir_10m_pst10mts: 237,
+    }),
+    observationFeature({
+      'msc_id-value': '3031094',
+      'date_tm-value': '2026-10-22T10:19:00.000Z',
+      air_temp: 2.5,
+      snw_dpth: -1,
+      rel_hum: 59,
+      pcpn_amt_pst10mts: 0,
+      avg_wnd_spd_10m_pst10mts: 5.8,
+      max_wnd_spd_10m_pst10mts: 9.9,
+      avg_wnd_dir_10m_pst10mts: 292,
+    }),
+    observationFeature({
+      'msc_id-value': '2100805',
+      'date_tm-value': '2026-10-22T10:19:00.000Z',
+      air_temp: -4.8,
+      snw_dpth: 15,
+      rel_hum: 88,
+      pcpn_amt_pst10mts: 0,
+      avg_wnd_spd_10m_pst10mts: 8.8,
+      max_wnd_spd_10m_pst10mts: 13.3,
+      avg_wnd_dir_10m_pst10mts: 244,
+    }),
+    observationFeature({
+      'msc_id-value': '1128582',
+      'date_tm-value': '2026-10-22T10:19:00.000Z',
+      air_temp: 5.1,
+      rel_hum: 76,
+      pcpn_amt_pst10mts: 0,
+      avg_wnd_spd_10m_pst10mts: 13.6,
+      max_wnd_spd_10m_pst10mts: 20.7,
+      avg_wnd_dir_10m_pst10mts: 107,
+    }),
+    observationFeature({
+      'msc_id-value': '1128582',
+      'date_tm-value': '2026-10-22T10:25:00.000Z',
+      air_temp: 4.9,
+      rel_hum: 77,
+      pcpn_amt_pst10mts: 0,
+      avg_wnd_spd_10m_pst10mts: 14.7,
+      max_wnd_spd_10m_pst10mts: 21.2,
+      avg_wnd_dir_10m_pst10mts: null,
+    }),
+    observationFeature({
+      'msc_id-value': '1108291',
+      'date_tm-value': '2026-10-22T10:00:00.000Z',
+      avg_wnd_spd_10m_pst10mts: 2,
+      max_wnd_spd_10m_pst10mts: 3.7,
+      avg_wnd_dir_10m_pst10mts: 222,
+    }),
+    observationFeature({
+      'msc_id-value': '1108291',
+      'date_tm-value': '2026-10-22T10:25:00.000Z',
+      avg_wnd_spd_10m_pst10mts: null,
+      max_wnd_spd_10m_pst10mts: null,
+      avg_wnd_dir_10m_pst10mts: null,
+    }),
+    observationFeature({
+      'msc_id-value': 'PC-NRMB_CBA1F1D0',
+      'date_tm-value': '2026-10-22T10:00:00.000Z',
+      air_temp: 4.6,
+      rel_hum: 70,
+    }),
+  ],
+};
+
+/** One `swob-stations` feature, in the envelope MSC GeoMet really returns. */
+function stationFeature(mscId, name, province, provider, coordinates) {
+  return {
+    type: 'Feature',
+    id: mscId,
+    geometry: { type: 'Point', coordinates },
+    properties: {
+      msc_id: mscId,
+      name,
+      province_territory: province,
+      data_provider: provider,
+    },
+  };
+}
+
+/**
+ * One `swob-realtime` feature.
+ *
+ * `geometry` is null because the fetcher asks for `skipGeometry=true`: the
+ * position is identity and comes from the station call, and the observation
+ * window is five thousand features wide.
+ */
+function observationFeature(properties) {
+  return {
+    type: 'Feature',
+    id: `${properties['date_tm-value']}-${properties['msc_id-value']}`,
+    geometry: null,
+    properties,
+  };
+}
