@@ -38,9 +38,12 @@ test('the complete Realtime tool payload pins the manifest-generated layer relea
     // requested radius and center authority in descriptions only.
     // Street Level and GNSS extend the manifest; tracked and analyst aircraft describe broadcasts.
     // Air quality (ECCC AQHI) extends the manifest.
-    // Alpine Stations adds its toggle/analyst enum values, aliases and field
-    // hints; it rides the existing tools and edits none of them.
-    '760a0d21fdeadbb222b2da8a750cb1c36df0629336374fe713c74e953833bdf0',
+    // Mountain Stations adds its toggle/analyst enum values, aliases and field
+    // hints; it rides the existing tools and edits none of them. Re-pinned when
+    // the layer was renamed from Alpine Stations: the schema carries a layer's
+    // first two aliases, so "mountain stations/alpine stations" replaced
+    // "alpine stations/weather stations".
+    '758143a23cd23ba9d9661f95b5382d2e87c7f7ab1da33da89ae05de9c4ec6a14',
   );
 });
 

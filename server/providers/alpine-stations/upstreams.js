@@ -1,5 +1,5 @@
 /**
- * Every Alpine-station upstream, as a fixed URL with its own read cap.
+ * Every mountain-station upstream, as a fixed URL with its own read cap.
  *
  * Fixed because nothing a visitor sends reaches these: the route takes no
  * destination parameter, so the proxy cannot be pointed anywhere. The only
@@ -21,6 +21,28 @@ const MIB = 1024 * KIB;
 
 /** Upstream wait ceiling. The SLF measurement payload is the slow one. */
 export const UPSTREAM_TIMEOUT_MS = 25_000;
+
+/**
+ * Networks that need longer than the ceiling above, and why.
+ *
+ * SNOTEL is not one payload but about seven, because AWDB caps a request at
+ * 1000 station elements. Measured against the live API, the whole network
+ * takes roughly 30 seconds whether the station lists are cached or not: the
+ * data endpoint itself is slow, not the metadata. Raising the shared ceiling
+ * to suit it would let a genuinely stuck European upstream hold a request for
+ * twice as long as it should, so the budget is per network.
+ *
+ * Only the FIRST request after a cold start waits this long. After that the
+ * cache answers, and a failure serves the last payload rather than blocking.
+ */
+export const UPSTREAM_TIMEOUT_OVERRIDES_MS = Object.freeze({
+  'usda-snotel': 60_000,
+});
+
+/** The wait ceiling for one network. */
+export function upstreamTimeoutMs(networkId) {
+  return UPSTREAM_TIMEOUT_OVERRIDES_MS[networkId] ?? UPSTREAM_TIMEOUT_MS;
+}
 
 /**
  * Refresh windows.
@@ -84,6 +106,48 @@ export const TAWES_DATASET =
 export const TAWES_METADATA_URL = `${TAWES_DATASET}/metadata`;
 export const TAWES_METADATA_MAX_BYTES = 4 * MIB;
 export const TAWES_OBSERVATIONS_MAX_BYTES = 8 * MIB;
+
+export const SNOTEL_BASE =
+  'https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1';
+export const SNOTEL_STATIONS_MAX_BYTES = 4 * MIB;
+export const SNOTEL_DATA_MAX_BYTES = 8 * MIB;
+
+/**
+ * The states SNOTEL covers.
+ *
+ * The station lists are read one state at a time, because that is what the
+ * API's wildcard triplet understands and it keeps each list small enough to
+ * cache. READINGS are not read this way: see `snotelDataUrl`.
+ *
+ * Fixed rather than discovered, like every other URL here: a state list is
+ * identity, it changes when a state joins the network, and discovering it
+ * would mean an extra round trip to learn something that has not changed in
+ * years.
+ */
+/**
+ * Stations per data request.
+ *
+ * AWDB refuses a request over 1000 station ELEMENTS, returned as a plain 400.
+ * Five elements per station puts the ceiling at 200, and 150 leaves room for a
+ * sixth element without re-tuning this.
+ */
+export const SNOTEL_STATIONS_PER_REQUEST = 150;
+
+export const SNOTEL_STATES = Object.freeze([
+  'AK',
+  'AZ',
+  'CA',
+  'CO',
+  'ID',
+  'MT',
+  'NM',
+  'NV',
+  'OR',
+  'SD',
+  'UT',
+  'WA',
+  'WY',
+]);
 
 /**
  * Stations per observation request.

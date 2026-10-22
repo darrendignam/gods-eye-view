@@ -995,11 +995,13 @@ test('the voice TOOL SCHEMA matches the pinned contract — the mission mapping 
   // list descriptions; the missions still ride existing tools.
   // Street Level and GNSS extend the manifest; broadcast caveats describe tracked and analyst aircraft.
   // Air quality (ECCC AQHI) extends the manifest.
-  // Alpine Stations adds toggle enum values, aliases and field hints.
-  assert.equal(block.length, 30947, 'serialized tool schema length drifted');
+  // Mountain Stations adds toggle enum values, aliases and field hints; the
+  // rename from Alpine Stations moved one alias ahead of another, one character
+  // longer.
+  assert.equal(block.length, 30948, 'serialized tool schema length drifted');
   assert.equal(
     crypto.createHash('sha256').update(block).digest('hex'),
-    'b5f88476afb61b2af449b753b38a751bc8ea0591290d234d98f5018386d01e1b',
+    '9608473019f197656d6cca3cb51b17c27bb7b0b60239114c2fd278df08d75cc7',
     'the first-run missions must ride EXISTING tools: no schema edit, no cache bust',
   );
   const instructions = fs.readFileSync(

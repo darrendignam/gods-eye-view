@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * qa-alpine-stations — drive the Alpine Stations layer in the real app and
+ * qa-alpine-stations — drive the Mountain Stations layer in the real app and
  * check the things unit tests cannot see.
  *
  * Three claims in particular only hold in a browser:
@@ -22,6 +22,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import puppeteer from 'puppeteer';
+import { ALPINE_NETWORK_IDS } from '../src/layers/alpineStations/networks.js';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -98,8 +99,8 @@ try {
   );
   check(
     'the proxy merges every network',
-    envelope.networks?.length === 3,
-    `${envelope.networks?.length} networks`,
+    envelope.networks?.length === ALPINE_NETWORK_IDS.length,
+    `${envelope.networks?.length} of ${ALPINE_NETWORK_IDS.length} networks`,
   );
   check(
     'at least one network is reachable',
@@ -332,7 +333,7 @@ try {
   check('the card appears in the WEATHER rail', card !== null);
   check(
     'the card is titled for the layer',
-    /Alpine Stations/i.test(card?.title || ''),
+    /Mountain Stations/i.test(card?.title || ''),
     card?.title,
   );
   check(

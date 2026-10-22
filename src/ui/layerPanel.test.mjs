@@ -358,7 +358,7 @@ test('the Weather readout receives enabled air-quality alongside weather layers'
   );
 });
 
-test('the Alpine station card sits in Weather, after wind and before the rasters', () => {
+test('the mountain station card sits in Weather, after wind and before the rasters', () => {
   // The rail renders this group in PANEL_ORDER order, and the observed-history
   // group below it owns the three timeline-driven raster products.
   const source = readFileSync(

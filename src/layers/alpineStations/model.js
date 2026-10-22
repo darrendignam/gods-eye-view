@@ -1,5 +1,5 @@
 /**
- * Marker and ambient-label presentation for the Alpine station layer.
+ * Marker and ambient-label presentation for the mountain station layer.
  *
  * Deliberately free of Cesium, for two reasons. The band colours have to be
  * the same values the rail legend renders, so they stay CSS strings and the

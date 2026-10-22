@@ -149,7 +149,7 @@ test('every Street Level imagery source is in the attribution lightbox', () => {
     );
 });
 
-test('every Alpine station network is credited, with its licence and caveat', () => {
+test('every mountain station network is credited, with its licence and caveat', () => {
   // CC BY is a licence condition, not a courtesy: the credit lightbox is the
   // app's canonical attribution surface, so a network on screen without an
   // entry here is a licence breach rather than a cosmetic gap.

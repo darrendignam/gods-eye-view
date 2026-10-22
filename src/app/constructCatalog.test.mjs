@@ -47,7 +47,7 @@ test('catalogs construct distinct layers and classification from their supplied 
     { id: 'local-adsb', disposition: 'local-only' },
     'the hardware-local layer is never serialized into links',
   );
-  assert.ok(first.get('alpine-stations'), 'Alpine stations are registered');
+  assert.ok(first.get('alpine-stations'), 'Mountain stations are registered');
   assert.deepEqual(
     first.metadata.find(({ id }) => id === 'alpine-stations'),
     { id: 'alpine-stations', disposition: 'pending-share-token' },

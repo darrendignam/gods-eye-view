@@ -1,5 +1,5 @@
 /**
- * The canonical Alpine station record, and the operations over a whole set.
+ * The canonical mountain station record, and the operations over a whole set.
  *
  * Every network adapter produces THIS shape, in THESE units, so nothing
  * downstream is network-aware:

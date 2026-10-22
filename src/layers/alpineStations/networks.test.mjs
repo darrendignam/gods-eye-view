@@ -5,6 +5,7 @@ import {
   ALPINE_NETWORK_IDS,
   SLF_NETWORK_ID,
   SMN_NETWORK_ID,
+  SNOTEL_NETWORK_ID,
   TAWES_NETWORK_ID,
   alpineAttribution,
   alpineNetwork,
@@ -12,14 +13,22 @@ import {
 } from './networks.js';
 import { STATION_PARAMETER_IDS } from './parameters.js';
 
+// Licences a network may carry. An allowlist, not a pattern: the test exists
+// to stop a share-alike or non-commercial source being added by someone who
+// read "open" loosely, so a new entry here should be a deliberate decision.
+const REDISTRIBUTABLE = new Set(['CC BY 4.0', 'Public domain']);
+
 test('every network is keyless, openly licensed and names its own attribution', () => {
   // Eligibility for this layer IS the licence: a network that needs a token or
   // forbids redistribution belongs behind the key registry, not here.
   assert.ok(ALPINE_NETWORKS.length >= 3);
   for (const network of ALPINE_NETWORKS) {
     assert.match(network.id, /^[a-z]+(?:-[a-z0-9]+)+$/, network.id);
-    assert.equal(network.licence, 'CC BY 4.0', network.id);
-    assert.match(network.licenceUrl, /^https:\/\/creativecommons\.org\//);
+    assert.ok(REDISTRIBUTABLE.has(network.licence), network.licence);
+    assert.match(network.licenceUrl, /^https:\/\//, network.id);
+    // Public-domain data imposes no attribution condition, but the operators
+    // are still named: the map should say where a reading came from whether
+    // or not a licence compels it.
     assert.ok(network.attribution.length > 2, network.id);
     assert.match(network.homepage, /^https:\/\//);
     assert.match(network.country, /^[A-Z]{2}$/);
@@ -79,4 +88,27 @@ test('attribution credits exactly the networks present, and nothing else', () =>
     assert.ok(all.includes(network.attribution), network.id);
   assert.equal(alpineAttribution([]), '');
   assert.equal(alpineAttribution(['nope']), '');
+});
+
+test('the attribution names each licence over the networks it covers', () => {
+  // The networks no longer share one licence. A single trailing "(CC BY 4.0)"
+  // asserted a licence NRCS never granted, and implied a condition that
+  // public-domain data does not carry.
+  const all = alpineAttribution();
+  assert.match(all, /SLF.*MeteoSwiss.*GeoSphere Austria \(CC BY 4\.0\)/);
+  assert.match(all, /USDA NRCS \(Public domain\)/);
+  assert.equal(
+    (all.match(/CC BY 4\.0/g) || []).length,
+    1,
+    'the shared licence is named once, not per operator',
+  );
+  // A payload without the US network must not mention public domain at all.
+  const swissOnly = alpineAttribution([SLF_NETWORK_ID, SMN_NETWORK_ID]);
+  assert.ok(!swissOnly.includes('Public domain'), swissOnly);
+  assert.ok(!swissOnly.includes('NRCS'), swissOnly);
+  assert.match(swissOnly, /\(CC BY 4\.0\)$/);
+  // And one with only the US network must not claim CC BY.
+  const usOnly = alpineAttribution([SNOTEL_NETWORK_ID]);
+  assert.equal(usOnly, 'USDA NRCS (Public domain)');
+  assert.equal(alpineAttribution([]), '');
 });

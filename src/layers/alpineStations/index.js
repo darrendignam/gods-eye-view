@@ -57,8 +57,8 @@ export const NEAREST_LIST_LIMIT = 6;
 export const NEAREST_LIST_MAX_KM = 400;
 
 /**
- * Alpine automatic weather stations — SLF IMIS, SwissMetNet and TAWES as one
- * layer with one adapter per network.
+ * Mountain automatic weather stations — SLF IMIS, SwissMetNet, TAWES and
+ * SNOTEL as one layer with one adapter per network.
  *
  * Rendering follows the earthquakes layer's rule: geometry is STATIC, written
  * only when a poll brings new data or the selected parameter changes. There is
@@ -88,9 +88,9 @@ export function createAlpineStationsLayer({
   credit = null,
 } = {}) {
   if (typeof source?.getSnapshot !== 'function')
-    throw new TypeError('Alpine stations require a snapshot source');
+    throw new TypeError('Mountain stations require a snapshot source');
   if (!overlayHost)
-    throw new TypeError('Alpine stations require an overlay host');
+    throw new TypeError('Mountain stations require an overlay host');
 
   let viewer = null;
   let dataSource = null;
@@ -383,14 +383,14 @@ export function createAlpineStationsLayer({
 
   const layer = {
     id: ALPINE_STATIONS_LAYER_ID,
-    name: 'Alpine Stations',
+    name: 'Mountain Stations',
     icon: '⛰',
-    source: 'SLF · MeteoSwiss · GeoSphere',
+    source: 'SLF · MeteoSwiss · GeoSphere · USDA NRCS',
     updateInterval: 300_000,
 
     init(nextViewer) {
       if (viewer)
-        throw new Error('Alpine station layer is already initialized');
+        throw new Error('Mountain station layer is already initialized');
       viewer = nextViewer;
       dataSource = new cesium.CustomDataSource(ALPINE_STATIONS_LAYER_ID);
       dataSource.show = false;
@@ -447,7 +447,7 @@ export function createAlpineStationsLayer({
         return true;
       } catch (failure) {
         if (owned.signal.aborted || request !== owned || !enabled) return false;
-        error = failure?.message || msg('Alpine station source unavailable');
+        error = failure?.message || msg('Mountain station source unavailable');
         return false;
       } finally {
         if (request === owned) {
@@ -581,7 +581,7 @@ export function createAlpineStationsLayer({
       return {
         readout: true,
         summary: {
-          label: t('Alpine Stations'),
+          label: t('Mountain Stations'),
           coverage: [
             ...new Set(ALPINE_NETWORKS.map((network) => network.country)),
           ].join(' · '),
@@ -627,7 +627,7 @@ export function createAlpineStationsLayer({
             : {}),
         },
         list: {
-          ariaLabel: t('Nearest Alpine weather stations in view'),
+          ariaLabel: t('Nearest mountain weather stations in view'),
           items: inView.map(({ station: item, km }, index) => ({
             id: item.id,
             ordinal: index + 1,
@@ -659,7 +659,7 @@ export function createAlpineStationsLayer({
           .filter(Boolean)
           .join('\n'),
         infoTitle:
-          'Automatic Alpine weather stations from three keyless, openly licensed national networks. Choose which measurement the markers encode; marker colour is the band and size is the distance from an ordinary reading. A dim marker is a station that is reporting but does not measure the selected value, or whose newest reading is too old to present. Pick a station in the list for its full readings. Snow depth is a measurement, not an avalanche danger rating.',
+          'Automatic mountain weather stations from four keyless, openly licensed national networks. Choose which measurement the markers encode; marker colour is the band and size is the distance from an ordinary reading. A dim marker is a station that is reporting but does not measure the selected value, or whose newest reading is too old to present. Pick a station in the list for its full readings. Snow depth is a measurement, not an avalanche danger rating.',
       };
     },
 

@@ -696,11 +696,11 @@ test('a selected station reads once, in the result block, not twice', async () =
 });
 
 test('the card badge names each country once, not once per network', () => {
-  // Two of the three networks are Swiss, so mapping network -> country gave
-  // "CH · CH · AT".
+  // Two of the networks are Swiss, so mapping network -> country gave
+  // "CH · CH · AT". The order follows the registry, not the alphabet.
   const { layer } = build();
   layer.enable();
-  assert.equal(layer.getRowControls().summary.coverage, 'CH · AT');
+  assert.equal(layer.getRowControls().summary.coverage, 'CH · AT · US');
 });
 
 test('a network that did not answer is not named as a source for a reading', async () => {
