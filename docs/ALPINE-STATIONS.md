@@ -10,21 +10,29 @@ the layer or adding a network.
 
 ## What the layer is
 
-About 1,600 automatic weather stations across the Swiss and Austrian Alps and
-the US mountain west, drawn as simple markers coloured by one selected
-measurement, with the readings, the legend and the nearest stations in view in
-a card in the WEATHER rail.
+About 1,700 automatic weather stations across the Swiss and Austrian Alps, the
+US mountain west and the Canadian Cordillera, drawn as simple markers coloured
+by one selected measurement, with the readings, the legend and the nearest
+stations in view in a card in the WEATHER rail.
 
-Four networks, one adapter each. Every one is keyless and openly licensed,
+Five networks, one adapter each. Every one is keyless and openly licensed,
 which is the condition of inclusion: the layer works on a fresh clone with no
 credentials, like USGS earthquakes rather than like TomTom. The three European
-networks are CC BY 4.0; SNOTEL is US public domain.
+networks are CC BY 4.0, SNOTEL is US public domain, and SWOB carries ECCC's
+own Data Services End-use Licence.
 
 | Network | Stations | Cadence | Publishes |
 |---|---|---|---|
 | SLF IMIS (CH) | ~200 | 30 min | snow, wind, temperature |
 | SwissMetNet (CH) | 159 | 10 min | wind, temperature, precipitation, pressure |
 | GeoSphere TAWES (AT) | ~285 | 10 min | snow, wind, temperature, precipitation |
+| USDA SNOTEL (US) | ~920 | 60 min | snow, wind, temperature |
+| ECCC SWOB (CA) | 160 | 60 min | snow, wind, temperature, precipitation |
+
+Two of the five are geographic subsets of a national network, because the
+layer is a mountain layer: SNOTEL exists only in the western states, and SWOB
+is restricted to the Cordillera. The others are whole countries that are
+themselves mountainous.
 
 ## The shape of it
 
@@ -161,7 +169,7 @@ naked `valid_from`/`valid_to` beside the offsets this reads, so the shape is
 already in the feed; `parseSmnTimestamp` does its own round-trip check on top,
 because VQHA80 carries no offset at all and is known to be Swiss local time.
 
-### Pressure is QFF, and three of the four networks cannot supply it
+### Pressure is QFF, and four of the five networks cannot supply it
 
 Station-level pressure (QFE) is a map of ALTITUDE, not of weather. Measured
 across SwissMetNet, `prestas0` spanned 663-991 hPa on a day whose real synoptic
@@ -177,6 +185,13 @@ spread was under 3 hPa.
   PRED 707.7 — an 11 hPa correction over three kilometres. Nothing in the
   payload says which regime applies. `pressure` is absent from that network's
   registry entry and a test pins the exclusion.
+- **SNOTEL**: no pressure element at all.
+- **ECCC SWOB**: `stn_pres` is the only pressure in the payload and it is
+  station level, so the same exclusion applies for the third time. Measured
+  live across the 144 Cordillera stations that publish it, the readings spanned
+  752-1,016 hPa in one minute: Vancouver Sea Island at 4 m on 1,012 hPa and
+  Nakiska Ridgetop at 2,450 m on 752.3 hPa. That is a map of the Rockies, not
+  of a pressure system.
 
 ### SwissMetNet wind is km/h in one column family and m/s in another
 
@@ -465,6 +480,14 @@ curl -s -o /dev/null -w '%{content_type}\n' http://localhost:4173/api/alpine-sta
   who tries: `aws.slf.ch/api/bulletin/caaml` and `aws.slf.ch/api/warningregion/`
   both return HTML rather than data when fetched directly, despite being cited
   on SLF's own data-service page. Find the real endpoints first.
+- **Canada outside the Cordillera.** SWOB is national: 938 stations, of which
+  327 are in British Columbia, Alberta, Yukon and the Northwest Territories.
+  Drawing the rest would put the prairies, the Shield and the Arctic coast on a
+  mountain layer. The province list is three constants in `networks/eccc.js`.
+- **The NAV CANADA and DND stations on the SWOB feed**, and the separate
+  `swob-partner-stations` collection, which carries Parks Canada sites in
+  Kootenay and Banff that would be genuinely useful here. Both are a licensing
+  question rather than a code one: see the Canadian section below.
 
 ## The US network, and what it cost
 
@@ -529,3 +552,114 @@ for SNOTEL.
 reading a hydrologist would come for. There is no canonical field for it, and
 adding one means a new parameter view, its own bands and legend, and every
 other network declaring it absent. It is deliberately left for its own change.
+
+## The Canadian network, and what it cost
+
+SWOB is the fifth network. Environment and Climate Change Canada publishes
+surface weather observations through MSC GeoMet's OGC API, and the 160 stations
+this layer draws are the ones MSC operates in British Columbia, Alberta and
+Yukon. Keyless, metric, hourly or better.
+
+It was the easiest of the five in one respect and the hardest in another: the
+measures need almost no translation, and the readings endpoint is a
+thirty-day archive of the whole country that will happily let you page through
+it for a week.
+
+### The licence is on an ECCC page, and the third-party clause matters
+
+Third-party catalogues describe MSC data as Open Government Licence - Canada.
+That is not what the service says. `api.weather.gc.ca` names the
+**Environment and Climate Change Canada Data Services End-use Licence**,
+version 2.1.1, which grants "a worldwide, royalty-free, perpetual,
+non-exclusive licence to use the Information, including for commercial
+purposes" with the freedom to "copy, modify, publish, translate, adapt,
+distribute or otherwise use" it, on the condition that the source is
+acknowledged. That clears the layer's bar, and the credit links the licence as
+clause 3 asks.
+
+Clause 4 is why this network is not the whole feed. It grants no right to use
+"third party rights that the Information Provider ... is not authorized to
+licence", and the SWOB collection relays 343 NAV CANADA and 9 DND stations
+beside MSC's own 572. ECCC does not say which third parties it may license, so
+the adapter filters on `data_provider === 'MSC'` and the credit names one
+originator. The cost is 101 aerodrome AWOS sites inside the three provinces:
+six of them above 1,000 m, the highest at 1,201 m, and measured live, not one
+of their 123 observations carried a snow depth. Including them is a licensing
+question someone with an answer can reopen; the filter is one constant.
+
+### `swob-realtime` is an archive, and the obvious read is the wrong one
+
+The collection holds **13,882,141 items**, one per observation file over about
+thirty days. There is no "current" endpoint. A `datetime=<iso>/..` filter is
+the way in, and the window then has to be reduced to the newest observation per
+station, the way `latestSlfMeasurements` does for SLF.
+
+Three query parameters turn that into a bounded read, and all three are
+load-bearing:
+
+- `bbox` scopes it to the Cordillera. The readings cannot be scoped the way the
+  station lists are: `prov-value` exists in the collection's queryables but
+  **only partner networks populate it**. Asking `prov-value=BC` returned 15
+  items in seventy minutes, all of them Parks Canada, which looks exactly like
+  a working filter over a quiet network.
+- `properties=` trims 226 columns to the ten that are read. Untrimmed, ten
+  features are 83 KB; trimmed, five thousand are 1.9 MB.
+- `sortby=-date_tm-value` puts the newest first. The response is otherwise
+  ordered oldest-first, so a truncated read would lose exactly the readings the
+  layer draws. Sorted, truncation costs duplicate old readings from stations
+  already in hand.
+
+`skipGeometry=true` drops a position the station call already supplies.
+
+### Two cadences in one network, and the slower one sets the staleness window
+
+About ninety of the 160 stations publish every minute; the rest publish once an
+hour, on the hour. Measured live, a 15-minute window returned 81 stations and a
+65-minute window returned 143. The window is 65 minutes for that reason: an
+hour, plus publication slack.
+
+`cadenceMinutes` is 60, which is the slower population. It sets the staleness
+floor, and an hourly station measured against a ten-minute cadence would read
+as late for fifty minutes of every hour.
+
+### The hourly stations publish no snow depth and no interval precipitation
+
+`snw_dpth` was present at 61 of 71 minute-cadence stations and **0 of 72**
+hourly ones; `pcpn_amt_pst10mts` at 67 and 0. Those columns stay absent rather
+than becoming zero. The registry still declares both parameters for the
+network, because the network does publish them: it is the individual station
+that has no sensor, which is the same shape as SLF's wind masts.
+
+`pcpn_amt_pst1hr` is published far more widely and is read by nothing here. It
+is an HOUR's accumulation, and the precipitation view is labelled `mm/10min`
+and scaled to 8 mm. Reading it would be the SNOTEL `PREC` mistake in a milder
+form, so Canada publishes the ten-minute depth or nothing.
+
+### The wind direction drops out of individual files while the speed stays
+
+This one only appears against the live feed. `avg_wnd_dir_10m_pst10mts` is
+missing from about 5% of observation files whose `avg_wnd_spd_10m_pst10mts` is
+present. Reading only the newest file per station left **108 of 147** stations
+with a wind arrow, and which stations lost theirs changed every minute.
+
+`ecccReadings` therefore fills a missing column from an earlier observation
+within `ECCC_BACKFILL_MS`, one averaging window of ten minutes. Every measure
+read here is instantaneous or an average over the past ten minutes, so a value
+from inside that window describes the same interval the newest observation
+does; beyond it, it is a different measurement and stays absent. The fill
+brings the direction to 147, exactly the number of stations that published a
+speed, and **no other column gains a single station** — which is how narrow it
+is, and why it is bounded rather than general.
+
+### `province_territory` holds names, and a page is not a list
+
+Two smaller traps, both cheap once known:
+
+- `province_territory` is `"British Columbia"`, not `"BC"`. Filtering on the
+  code matched nothing and reported an empty network rather than failing, which
+  is the quietest possible way to lose a country.
+- A station response is a PAGE. The three province lists are 92, 54 and 14 rows
+  against a `limit` of 1000, so there is room, but the fetcher compares
+  `numberMatched` with what arrived and refuses a province that came back
+  short. A list quietly arriving one page deep would drop stations with every
+  gate still green.

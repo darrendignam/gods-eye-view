@@ -122,6 +122,26 @@ try {
     envelope.attribution,
   );
   check(
+    'every network in the envelope carries stations the layer can place',
+    ALPINE_NETWORK_IDS.filter((id) =>
+      envelope.stations?.some((station) => station.networkId === id),
+    ).length === ALPINE_NETWORK_IDS.length,
+    ALPINE_NETWORK_IDS.map(
+      (id) =>
+        `${id}:${envelope.stations?.filter((s) => s.networkId === id).length ?? 0}`,
+    ).join(' '),
+  );
+  check(
+    'the Canadian network stays inside the Cordillera',
+    envelope.stations
+      ?.filter((station) => station.networkId === 'eccc-swob')
+      .every(
+        (station) =>
+          station.country === 'CA' && /^(BC|AB|YT)$/.test(station.region),
+      ),
+    'a station outside BC, Alberta or Yukon is not a mountain station here',
+  );
+  check(
     'an absent reading is null and a measured zero is kept',
     envelope.stations?.some((station) => station.snowDepthCm === 0) &&
       envelope.stations?.some((station) => station.snowDepthCm === null),

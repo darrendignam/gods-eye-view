@@ -12,6 +12,13 @@ import {
   readResponseJsonCapped,
   readResponseTextCapped,
 } from '../common/http.js';
+import {
+  ECCC_DATA_PROVIDER,
+  ECCC_OBSERVATION_QUERY,
+  ECCC_PROVINCES,
+  ECCC_STATION_QUERY,
+  joinEcccStations,
+} from '../../../src/layers/alpineStations/networks/eccc.js';
 import { joinSlfStations } from '../../../src/layers/alpineStations/networks/slf.js';
 import { joinSmnStations } from '../../../src/layers/alpineStations/networks/smn.js';
 import {
@@ -25,6 +32,13 @@ import {
   tawesStationIds,
 } from '../../../src/layers/alpineStations/networks/tawes.js';
 import {
+  ECCC_BBOX,
+  ECCC_COLLECTIONS,
+  ECCC_OBSERVATION_LIMIT,
+  ECCC_OBSERVATION_WINDOW_MS,
+  ECCC_OBSERVATIONS_MAX_BYTES,
+  ECCC_STATION_LIMIT,
+  ECCC_STATIONS_MAX_BYTES,
   SLF_MEASUREMENTS_MAX_BYTES,
   SLF_MEASUREMENTS_URL,
   SLF_STATIONS_MAX_BYTES,
@@ -240,6 +254,91 @@ export async function fetchSnotelStations(reader, signal, { readMetadata }) {
     chunks.map((chunk) => readSnotelChunk(reader, signal, chunk)),
   );
   return joinSnotelStations(stations, responses.flat());
+}
+
+/** The SWOB station URL for one province, already filtered to MSC's own sites. */
+export function ecccStationsUrl(province) {
+  const url = new URL(`${ECCC_COLLECTIONS}/swob-stations/items`);
+  url.search = new URLSearchParams({
+    limit: String(ECCC_STATION_LIMIT),
+    province_territory: province,
+    data_provider: ECCC_DATA_PROVIDER,
+    properties: ECCC_STATION_QUERY,
+    f: 'json',
+  }).toString();
+  return url.href;
+}
+
+/**
+ * The SWOB observation URL for the current window.
+ *
+ * `datetime` and `bbox` are both load-bearing rather than tidy: the collection
+ * is a 13.9-million-item archive of the whole country, and these two reduce it
+ * to about 5,300 features over the Cordillera. `sortby` puts the newest first
+ * so that a truncated response loses duplicate old readings, not current ones,
+ * and `skipGeometry` drops a position the station call already supplies.
+ */
+export function ecccObservationsUrl(now = Date.now()) {
+  const since = new Date(now - ECCC_OBSERVATION_WINDOW_MS).toISOString();
+  const url = new URL(`${ECCC_COLLECTIONS}/swob-realtime/items`);
+  url.search = new URLSearchParams({
+    limit: String(ECCC_OBSERVATION_LIMIT),
+    datetime: `${since}/..`,
+    bbox: ECCC_BBOX.join(','),
+    properties: ECCC_OBSERVATION_QUERY,
+    sortby: '-date_tm-value',
+    skipGeometry: 'true',
+    f: 'json',
+  }).toString();
+  return url.href;
+}
+
+/**
+ * ECCC SWOB: a station list per province, then one observation window.
+ *
+ * Station lists are cached per PROVINCE for the same reason SNOTEL's are
+ * cached per state: one province failing on a cold cache must not take the
+ * others out for the whole metadata window.
+ *
+ * A list that came back truncated is REJECTED rather than used. `numberMatched`
+ * is the collection's own count, and a province quietly arriving one page deep
+ * would drop stations with every gate still green.
+ *
+ * The window is read after the lists, not beside them, for the reason SLF's
+ * two calls are sequential: the station lists are 39 KB between them, so a
+ * service that is down fails on those rather than on a 1.9 MB read.
+ */
+export async function fetchEcccStations(reader, signal, { readMetadata }) {
+  const lists = await Promise.allSettled(
+    ECCC_PROVINCES.map((province) =>
+      readMetadata(
+        () =>
+          reader.json(
+            ecccStationsUrl(province),
+            ECCC_STATIONS_MAX_BYTES,
+            signal,
+          ),
+        province,
+      ),
+    ),
+  );
+  const features = [];
+  for (const list of lists) {
+    if (list.status !== 'fulfilled') continue;
+    const page = Array.isArray(list.value?.features) ? list.value.features : [];
+    const matched = list.value?.numberMatched;
+    if (Number.isFinite(matched) && matched > page.length) continue;
+    features.push(...page);
+  }
+  if (!features.length) throw new Error('alpine_upstream_unavailable');
+  const observations = await reader.json(
+    ecccObservationsUrl(),
+    ECCC_OBSERVATIONS_MAX_BYTES,
+    signal,
+  );
+  if (!Array.isArray(observations?.features))
+    throw new Error('alpine_invalid_payload');
+  return joinEcccStations(features, observations);
 }
 
 /** The observation URL for one chunk of GeoSphere station ids. */

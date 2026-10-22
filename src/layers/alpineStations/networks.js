@@ -1,5 +1,5 @@
 /**
- * The Alpine automatic weather networks this layer can draw, one entry per
+ * The mountain automatic weather networks this layer can draw, one entry per
  * operator.
  *
  * Every network here is keyless and openly licensed, which is what makes them
@@ -22,6 +22,7 @@ export const SLF_NETWORK_ID = 'slf-imis';
 export const SMN_NETWORK_ID = 'meteoswiss-smn';
 export const TAWES_NETWORK_ID = 'geosphere-tawes';
 export const SNOTEL_NETWORK_ID = 'usda-snotel';
+export const ECCC_NETWORK_ID = 'eccc-swob';
 
 export const ALPINE_NETWORKS = Object.freeze([
   Object.freeze({
@@ -98,6 +99,27 @@ export const ALPINE_NETWORKS = Object.freeze([
     parameters: Object.freeze(['snow', 'wind', 'temperature']),
     cadenceMinutes: 60,
   }),
+  Object.freeze({
+    id: ECCC_NETWORK_ID,
+    // i18n-ignore: the operator's own name for the network
+    label: 'MSC SWOB',
+    name: 'Environment and Climate Change Canada (Meteorological Service of Canada)',
+    country: 'CA',
+    homepage: 'https://eccc-msc.github.io/open-data/',
+    licence: 'ECCC End-use Licence',
+    licenceUrl: 'https://eccc-msc.github.io/open-data/licence/readme_en/',
+    attribution: 'Environment and Climate Change Canada',
+    // No pressure. `stn_pres` is station level (QFE) and nothing in the SWOB
+    // payload reduces it to sea level, which is the third network to publish
+    // only QFE. See the pressure rule in ../records.js.
+    parameters: Object.freeze(['snow', 'wind', 'temperature', 'precipitation']),
+    // Two cadences in one network: about 90 of the stations publish every
+    // minute and the rest once an hour, on the hour. The registry carries the
+    // SLOWER one because this figure sets the staleness window, and an hourly
+    // station measured against a ten-minute window would report as late for
+    // fifty minutes of every hour. See ./networks/eccc.js.
+    cadenceMinutes: 60,
+  }),
 ]);
 
 export const ALPINE_NETWORK_IDS = Object.freeze(
@@ -124,10 +146,10 @@ export function networksMeasuring(parameterId) {
  * CC BY is a condition rather than a courtesy, so this credits the operators
  * whose data is on screen and stays silent about the rest.
  *
- * The licence is named per GROUP, not once for the line. The networks no
- * longer share one: SNOTEL is US public domain, and a single trailing
- * "(CC BY 4.0)" would have asserted a licence NRCS never granted while
- * implying a condition its data does not carry.
+ * The licence is named per GROUP, not once for the line. The networks do not
+ * share one: SNOTEL is US public domain and SWOB carries ECCC's own end-use
+ * licence, so a single trailing "(CC BY 4.0)" would assert a licence neither
+ * operator granted while implying conditions their data does not carry.
  */
 export function alpineAttribution(networkIds = ALPINE_NETWORK_IDS) {
   const present = ALPINE_NETWORKS.filter((network) =>

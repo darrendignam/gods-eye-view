@@ -121,7 +121,9 @@ export const ALPINE_STATIONS_INLINE_CREDIT =
   '<a href="https://data.hub.geosphere.at/" target="_blank" rel="noopener">GeoSphere Austria</a> ' +
   '(<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>) · ' +
   '<a href="https://www.nrcs.usda.gov/wps/portal/wcc/home/" target="_blank" rel="noopener">USDA NRCS</a> ' +
-  '(public domain)';
+  '(public domain) · ' +
+  '<a href="https://eccc-msc.github.io/open-data/" target="_blank" rel="noopener">Environment and Climate Change Canada</a> ' +
+  '(<a href="https://eccc-msc.github.io/open-data/licence/readme_en/" target="_blank" rel="noopener">end-use licence</a>)';
 
 /** Show the on-globe Alpine station credit. Idempotent per viewer. */
 export function showAlpineStationsCredit(viewer) {
@@ -460,7 +462,11 @@ export const DATA_CREDITS = [
       '<a href="https://data.hub.geosphere.at/" target="_blank" rel="noopener">GeoSphere Austria</a> (TAWES), each ' +
       '<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · ' +
       '<a href="https://www.nrcs.usda.gov/wps/portal/wcc/home/" target="_blank" rel="noopener">USDA NRCS</a> (SNOTEL), ' +
-      '<a href="https://www.usa.gov/government-works" target="_blank" rel="noopener">US public domain</a>. ' +
+      '<a href="https://www.usa.gov/government-works" target="_blank" rel="noopener">US public domain</a> · ' +
+      '<a href="https://eccc-msc.github.io/open-data/" target="_blank" rel="noopener">Environment and Climate Change Canada</a> (SWOB), ' +
+      '<a href="https://eccc-msc.github.io/open-data/licence/readme_en/" target="_blank" rel="noopener">Data Services End-use Licence</a>. ' +
+      'Swiss and Austrian stations nationwide; US and Canadian stations in the ' +
+      'western mountain states, British Columbia, Alberta and Yukon. ' +
       'Measurements only, not avalanche danger ratings.',
   },
   {

@@ -14,6 +14,8 @@
  *   SwissMetNet VQHA80  ~16 KB
  *   TAWES metadata      ~87 KB
  *   TAWES observations  ~210 KB
+ *   ECCC stations       ~39 KB    (three provinces, trimmed properties)
+ *   ECCC observations   ~1.9 MB   (~5,300 features, a 65-minute window)
  */
 
 const KIB = 1024;
@@ -157,3 +159,51 @@ export const SNOTEL_STATES = Object.freeze([
  * any proxy's line limit and bounds the damage if the network grows.
  */
 export const TAWES_STATIONS_PER_REQUEST = 150;
+
+export const ECCC_COLLECTIONS = 'https://api.weather.gc.ca/collections';
+export const ECCC_STATIONS_MAX_BYTES = 4 * MIB;
+export const ECCC_OBSERVATIONS_MAX_BYTES = 8 * MIB;
+
+/**
+ * How far back the observation window reaches.
+ *
+ * `swob-realtime` is a thirty-day archive of 13.9 million observation files,
+ * so the window is the only thing standing between this and an unbounded read.
+ * It has to clear an hour: about ninety of the stations publish every minute
+ * but the rest publish once an hour, on the hour, and a shorter window drops
+ * them. Measured live, 15 minutes returned 81 stations and 65 minutes
+ * returned 143 of the 160 in scope.
+ */
+export const ECCC_OBSERVATION_WINDOW_MS = 65 * 60 * 1000;
+
+/**
+ * Features per observation request, with the newest first.
+ *
+ * The window is about 5,300 features because the minute-cadence sites publish
+ * sixty times an hour, and the cap is set above that rather than at it. The
+ * request sorts by `-date_tm-value` so that if the network ever outgrows the
+ * cap the response loses its OLDEST features, which are duplicate readings
+ * from stations already in hand, instead of the newest ones the layer draws.
+ */
+export const ECCC_OBSERVATION_LIMIT = 10_000;
+
+/**
+ * Stations per station request.
+ *
+ * One request per province returns 92, 54 and 14 rows, so this is headroom
+ * rather than a working limit. A province list cannot be paginated silently:
+ * the fetcher compares `numberMatched` against what arrived.
+ */
+export const ECCC_STATION_LIMIT = 1000;
+
+/**
+ * The observation bounding box: the Canadian Cordillera.
+ *
+ * `swob-realtime` publishes no province on an MSC observation — `prov-value`
+ * exists, but only partner networks populate it — so the readings cannot be
+ * filtered the way the station lists are. This box covers British Columbia,
+ * Alberta and Yukon, whose stations span 140.85 W to 110.21 W and 48.30 N to
+ * 69.16 N. Readings it catches outside those three provinces have no station
+ * to join to and are dropped.
+ */
+export const ECCC_BBOX = Object.freeze([-141, 48, -110, 70]);

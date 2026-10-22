@@ -57,8 +57,8 @@ export const NEAREST_LIST_LIMIT = 6;
 export const NEAREST_LIST_MAX_KM = 400;
 
 /**
- * Mountain automatic weather stations — SLF IMIS, SwissMetNet, TAWES and
- * SNOTEL as one layer with one adapter per network.
+ * Mountain automatic weather stations: SLF IMIS, SwissMetNet, TAWES, SNOTEL
+ * and ECCC SWOB as one layer with one adapter per network.
  *
  * Rendering follows the earthquakes layer's rule: geometry is STATIC, written
  * only when a poll brings new data or the selected parameter changes. There is
@@ -371,8 +371,9 @@ export function createAlpineStationsLayer({
         parameter: t(view().label).toLocaleLowerCase(getLocale()),
       });
     const { total, missing } = networkReach();
-    // Not `tn`: "networks" is governed by the total, which is always three, so
-    // the sentence does not change shape with the count.
+    // Not `tn`: "networks" is governed by the total, which is the size of the
+    // registry and never one, so the sentence does not change shape with the
+    // count.
     if (missing)
       return t('{count} of {total} networks unavailable', {
         count: formatNumber(missing),
@@ -385,7 +386,7 @@ export function createAlpineStationsLayer({
     id: ALPINE_STATIONS_LAYER_ID,
     name: 'Mountain Stations',
     icon: '⛰',
-    source: 'SLF · MeteoSwiss · GeoSphere · USDA NRCS',
+    source: 'SLF · MeteoSwiss · GeoSphere · USDA NRCS · ECCC',
     updateInterval: 300_000,
 
     init(nextViewer) {
@@ -659,7 +660,7 @@ export function createAlpineStationsLayer({
           .filter(Boolean)
           .join('\n'),
         infoTitle:
-          'Automatic mountain weather stations from four keyless, openly licensed national networks. Choose which measurement the markers encode; marker colour is the band and size is the distance from an ordinary reading. A dim marker is a station that is reporting but does not measure the selected value, or whose newest reading is too old to present. Pick a station in the list for its full readings. Snow depth is a measurement, not an avalanche danger rating.',
+          'Automatic mountain weather stations from five keyless, openly licensed national networks. Choose which measurement the markers encode; marker colour is the band and size is the distance from an ordinary reading. A dim marker is a station that is reporting but does not measure the selected value, or whose newest reading is too old to present. Pick a station in the list for its full readings. Snow depth is a measurement, not an avalanche danger rating.',
       };
     },
 
